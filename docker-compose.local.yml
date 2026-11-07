@@ -69,3 +69,12 @@ services:
       - "8096:8096"
     volumes:
       - ./upstreams/minimax2api/data:/app/data
+
+  # minimax2api 自带的配套组件（Bearer -> _token Cookie），同项目同机
+  minimax-cookiefix:
+    build:
+      context: ./upstreams/minimax2api
+      dockerfile: Dockerfile
+    image: chatgpt-pool-ng-minimax2api:local
+    container_name: chatgpt-pool-ng-local-minimax-cookiefix
+    command: ["python3", "/app/cookie_fix.py", "18099"]

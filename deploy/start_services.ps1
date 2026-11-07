@@ -27,7 +27,12 @@ $services = @(
     @{ Name = 'minimax2api';     Exe = "$Repo\upstreams\minimax2api\backend\bin\minimax2api.exe"
        Args = @('-addr', '127.0.0.1:8096', '-data', 'data'); WorkDir = "$Repo\upstreams\minimax2api"
        Log = "$Repo\upstreams\minimax2api\run"; Port = 8096 }
-    @{ Name = 'grok2api';        Exe = "$Repo\upstreams\grok2api\backend\bin\grok2api.exe"
+    # minimax2api's own companion: rewrites the Bearer JWT into the
+    # _token cookie the upstream agent.minimax.io expects, then forwards.
+    # Same project, same machine - not an external dependency.
+    @{ Name = 'minimax-cookiefix'; Exe = 'python'
+       Args = @('cookie_fix.py', '18099'); WorkDir = "$Repo\upstreams\minimax2api"
+       Log = "$Repo\upstreams\minimax2api\cookiefix"; Port = 18099 }    @{ Name = 'grok2api';        Exe = "$Repo\upstreams\grok2api\backend\bin\grok2api.exe"
        Args = @('--config', 'config.yaml'); WorkDir = "$Repo\upstreams\grok2api"
        Log = "$Repo\upstreams\grok2api\run"; Port = 8002 }
     @{ Name = 'grok-register';    Exe = 'D:\xi\grok-register\.venv\Scripts\python.exe'

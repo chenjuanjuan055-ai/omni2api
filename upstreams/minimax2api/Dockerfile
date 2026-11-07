@@ -35,7 +35,8 @@ FROM alpine:${ALPINE_VERSION}
 
 ENV TZ=Asia/Shanghai
 
-RUN apk add --no-cache ca-certificates su-exec tzdata && \
+# python3: cookie_fix.py (the Bearer->Cookie shim minimax2api talks upstream through)
+RUN apk add --no-cache ca-certificates su-exec tzdata python3 && \
     addgroup -S -g 10002 minimax2api && \
     adduser -S -D -H -u 10002 -G minimax2api minimax2api && \
     mkdir -p /app/data && \
@@ -45,6 +46,7 @@ WORKDIR /app
 
 COPY --from=backend-builder --chmod=0755 /out/minimax2api /app/minimax2api
 COPY --from=frontend-builder /src/frontend/dist /app/frontend/dist
+COPY --chmod=0755 cookie_fix.py /app/cookie_fix.py
 
 EXPOSE 8096
 

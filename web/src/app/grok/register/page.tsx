@@ -19,6 +19,7 @@ import {
   testRegisterPool,
   updateRegisterConfig,
 } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import { useAuthGuard } from "@/lib/use-auth-guard";
 
 type FieldType = "text" | "password" | "number" | "switch" | "textarea" | "select";
@@ -117,7 +118,7 @@ export default function GrokRegisterPage() {
   const { isCheckingAuth } = useAuthGuard(["admin"]);
   const [job, setJob] = useState<Record<string, unknown>>({});
   const [form, setForm] = useState<Record<string, unknown>>(EMPTY_FORM);
-  const [baseUrl, setBaseUrl] = useState("http://127.0.0.1:8092");
+  const [baseUrl] = useState("http://127.0.0.1:8092");
   const [reachable, setReachable] = useState<boolean | null>(null);
   const [activeGroup, setActiveGroup] = useState("task");
   const [logs, setLogs] = useState<{ seq: number; line: string }[]>([]);
@@ -399,23 +400,29 @@ export default function GrokRegisterPage() {
       </div>
 
       <Card className="rounded-2xl border-white/80 bg-white/90 shadow-sm">
-        <CardContent className="flex flex-wrap items-end gap-3 p-4">
+        <CardContent className="flex flex-wrap items-center gap-3 p-4">
           <div className="flex items-center gap-2 text-xs text-stone-500">
-            <Server className="size-4 text-stone-400" /> 注册服务地址
+            <Server className="size-4 text-stone-400" /> 注册机
           </div>
-          <Input
-            value={baseUrl}
-            onChange={(e) => setBaseUrl(e.target.value)}
-            className="max-w-sm font-mono text-xs"
-            placeholder="http://127.0.0.1:8092"
-          />
-          <Button variant="outline" onClick={() => void saveService()} disabled={Boolean(busy)}>
-            {busy === "service" ? <LoaderCircle className="mr-1 size-4 animate-spin" /> : <Save className="mr-1 size-4" />}
-            保存并连接
-          </Button>
-          <span className={`text-xs ${reachable ? "text-emerald-600" : "text-rose-600"}`}>
-            {reachable === null ? "检测中" : reachable ? "已连接" : "不可达"}
+          <span
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium",
+              reachable === null
+                ? "bg-stone-100 text-stone-500"
+                : reachable
+                  ? "bg-emerald-50 text-emerald-700"
+                  : "bg-rose-50 text-rose-700",
+            )}
+          >
+            <span
+              className={cn(
+                "size-1.5 rounded-full",
+                reachable === null ? "bg-stone-400" : reachable ? "bg-emerald-500" : "bg-rose-500",
+              )}
+            />
+            {reachable === null ? "检测中" : reachable ? "运行中" : "未运行"}
           </span>
+          <span className="text-xs text-stone-400">内置于本网关，随网关一同启动</span>
         </CardContent>
       </Card>
 

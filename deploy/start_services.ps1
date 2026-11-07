@@ -36,9 +36,9 @@ $services = @(
     @{ Name = 'grok2api';        Exe = "$Repo\upstreams\grok2api\backend\bin\grok2api.exe"
        Args = @('--config', 'config.yaml'); WorkDir = "$Repo\upstreams\grok2api"
        Log = "$Repo\upstreams\grok2api\run"; Port = 8002 }
-    @{ Name = 'grok-register';    Exe = 'D:\xi\grok-register\.venv\Scripts\python.exe'
-       Args = @('-m', 'web.server'); WorkDir = 'D:\xi\grok-register'
-       Log = 'D:\xi\grok-register\webui'; Port = 8092 }
+    @{ Name = 'grok-register';    Exe = "$Repo\upstreams\grok-register\.venv\Scripts\python.exe"
+       Args = @('-m', 'web.server'); WorkDir = "$Repo\upstreams\grok-register"
+       Log = "$Repo\upstreams\grok-register\webui"; Port = 8092 }
     @{ Name = 'reg-exits-mihomo'; Exe = 'D:\xi\Ai\smart-proxy\mihomo-split.exe'
        Args = @('-f', 'config.yaml', '-d', '.'); WorkDir = 'D:\xi\Ai\smart-proxy\reg-exits'
        Log = 'D:\xi\Ai\smart-proxy\reg-exits\svc'; Port = 7940 }

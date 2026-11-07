@@ -10,6 +10,19 @@ upstreams/*/frontend/dist/
 upstreams/*/.gocache/
 # 含管理员口令与加密密钥的本地配置（用 *.example.yaml 做模板）
 upstreams/*/config.yaml
+# grok-register 的运行时产物与凭据
+upstreams/grok-register/accounts_*.txt
+upstreams/grok-register/cpa_auths/
+upstreams/grok-register/cpa_xai/
+upstreams/grok-register/config.json
+upstreams/grok-register/config.json.bak*
+upstreams/grok-register/*mailboxes*.txt
+upstreams/grok-register/mail_credentials.txt
+upstreams/grok-register/candidates.txt
+upstreams/grok-register/probe_swapped.txt
+upstreams/grok-register/proxy_pool.txt
+upstreams/grok-register/proxy_pool_state.json
+upstreams/grok-register/screenshots/
 *.pyc
 data/
 logs/

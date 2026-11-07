@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CircleAlert, LoaderCircle, Plug, Power, Save, Settings2 } from "lucide-react";
+import { CircleAlert, LoaderCircle, Save, Settings2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -19,10 +19,7 @@ import {
   fetchMinimaxSettings,
   fetchMinimaxUpstreamSettings,
   minimaxChangePassword,
-  minimaxTunnel,
-  saveMinimaxSettings,
   saveMinimaxUpstreamSettings,
-  type MinimaxSettings,
 } from "@/lib/api";
 import { useAuthGuard } from "@/lib/use-auth-guard";
 
@@ -158,7 +155,7 @@ const SECTIONS: Section[] = [
 
 export default function MinimaxSettingsPage() {
   const { isCheckingAuth } = useAuthGuard(["admin"]);
-  const [settings, setSettings] = useState<MinimaxSettings | null>(null);
+  const [settings, setSettings] = useState<Record<string, any> | null>(null);
   const [remote, setRemote] = useState<Record<string, any>>({});
   const [saving, setSaving] = useState("");
   const [message, setMessage] = useState("");
@@ -198,34 +195,6 @@ export default function MinimaxSettingsPage() {
     try {
       await saveMinimaxUpstreamSettings(remote);
       setMessage("上游设置已保存");
-      setError("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "保存失败");
-    } finally {
-      setSaving("");
-    }
-  };
-
-  const patch = (key: keyof MinimaxSettings, value: string | number | boolean) => {
-    setSettings((prev) => (prev ? { ...prev, [key]: value } : prev));
-  };
-
-  const save = async () => {
-    if (!settings) return;
-    setSaving("connection");
-    try {
-      const payload: Record<string, unknown> = {
-        base_url: settings.base_url,
-        username: settings.username,
-        password: settings.password,
-        auto_tunnel: Boolean(settings.auto_tunnel),
-        ssh_host: settings.ssh_host,
-        ssh_remote_port: Number(settings.ssh_remote_port) || 8095,
-        ssh_local_port: Number(settings.ssh_local_port) || 18095,
-      };
-      const data = await saveMinimaxSettings(payload);
-      setSettings(data.settings);
-      setMessage("已保存");
       setError("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "保存失败");
@@ -285,77 +254,9 @@ export default function MinimaxSettingsPage() {
         </Card>
       ) : null}
 
-      <Card className="rounded-2xl border-white/80 bg-white/90 shadow-sm">
-        <CardContent className="space-y-4 p-5">
-          <div className="text-sm font-semibold text-stone-900">连接网关</div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="mm-base">Base URL</Label>
-              <Input id="mm-base" value={settings.base_url} onChange={(e) => patch("base_url", e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="mm-user">管理员账号</Label>
-              <Input id="mm-user" value={settings.username} onChange={(e) => patch("username", e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="mm-pass">管理员密码</Label>
-              <Input
-                id="mm-pass"
-                type="password"
-                placeholder={settings.has_password ? "已配置（留空则保持不变）" : "未配置"}
-                onChange={(e) => patch("password", e.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="mm-host">SSH 主机</Label>
-              <Input id="mm-host" value={settings.ssh_host || ""} onChange={(e) => patch("ssh_host", e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="mm-rport">远端端口</Label>
-              <Input
-                id="mm-rport"
-                value={String(settings.ssh_remote_port ?? 8095)}
-                onChange={(e) => patch("ssh_remote_port", e.target.value.replace(/\D/g, ""))}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="mm-lport">本地端口</Label>
-              <Input
-                id="mm-lport"
-                value={String(settings.ssh_local_port ?? 18095)}
-                onChange={(e) => patch("ssh_local_port", e.target.value.replace(/\D/g, ""))}
-              />
-            </div>
-          </div>
-          <label className="flex items-center gap-2 text-sm text-stone-600">
-            <input
-              type="checkbox"
-              checked={Boolean(settings.auto_tunnel)}
-              onChange={(e) => patch("auto_tunnel", e.target.checked)}
-            />
-            自动建立隧道
-          </label>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" variant="outline" onClick={() => void tunnel("start")}>
-              <Plug className="size-4" />启动隧道
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => void tunnel("stop")}>
-              <Power className="size-4" />关闭隧道
-            </Button>
-            <span className="text-xs text-stone-400">
-              当前：{settings.tunnel_running ? "隧道在线" : "隧道未建立"}
-            </span>
-            <Button size="sm" onClick={() => void save()} disabled={saving !== ""}>
-              {saving === "connection" ? <LoaderCircle className="size-4 animate-spin" /> : <Save className="size-4" />}
-              保存连接设置
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
       <div className="flex items-center gap-2 pt-2">
         <Settings2 className="size-4 text-stone-400" />
-        <span className="text-sm font-semibold text-stone-900">上游设置</span>
+        <span className="text-sm font-semibold text-stone-900">运行参数</span>
         <span className="text-xs text-stone-400">
           {SECTIONS.length} 个分区 · {fieldCount} 个字段 · 直接改 minimax2api 的 settings
         </span>
@@ -451,8 +352,8 @@ export default function MinimaxSettingsPage() {
       })}
 
       <Card className="rounded-2xl border-white/80 bg-white/90 shadow-sm">
-        <CardContent className="space-y-2 p-5">
-          <div className="text-sm font-semibold text-stone-900">修改管理员密码</div>
+        <CardContent className="space-y-4 p-5">
+          <div className="text-sm font-semibold text-stone-900">管理员口令</div>
           <div className="flex flex-wrap items-end gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="mm-old">原密码</Label>

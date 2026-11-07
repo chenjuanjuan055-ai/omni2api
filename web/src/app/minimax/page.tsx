@@ -70,12 +70,10 @@ export default function MinimaxDashboardPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-stone-900">MiniMax 仪表盘</h1>
           <p className="mt-1 text-sm text-stone-500">
-            minimax2api 号池网关的统一视图 ·{" "}
-            <span className={status?.reachable ? "text-emerald-600" : "text-rose-500"}>
-              {status?.reachable ? "已连通" : "未连通"}
-            </span>
-            {status?.base_url ? ` · ${status.base_url}` : ""}
-            {status?.tunnel_running ? " · 隧道在线" : ""}
+            账号池与调用状态
+            {status?.reachable === false ? (
+              <span className="text-rose-500"> · 运行异常</span>
+            ) : null}
           </p>
         </div>
         <Button variant="outline" onClick={() => void load()} disabled={loading}>

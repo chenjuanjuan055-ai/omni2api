@@ -23,7 +23,7 @@ function GrokNav() {
     { href: "/grok/playground", label: "创作控制台", icon: Sparkles, match: () => pathname.startsWith("/grok/playground") },
     { href: "/grok/live", label: "实时控制台", icon: Activity, match: () => pathname.startsWith("/grok/live") },
     { href: "/grok/docs", label: "文档", icon: BookOpen, match: () => pathname.startsWith("/grok/docs") },
-    { href: "/grok/settings", label: "连接设置", icon: Plug, match: () => pathname.startsWith("/grok/settings") },
+    { href: "/grok/settings", label: "运行参数", icon: Plug, match: () => pathname.startsWith("/grok/settings") },
   ];
   return (
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 flex-col bg-[#121826] text-slate-200 md:flex">
@@ -75,7 +75,7 @@ function MinimaxNav() {
     { href: "/minimax/browser-login", label: "浏览器登录", icon: LogIn, match: () => pathname.startsWith("/minimax/browser-login") },
     { href: "/minimax/audits", label: "请求审计", icon: FileText, match: () => pathname.startsWith("/minimax/audits") },
     { href: "/minimax/docs", label: "API 文档", icon: BookOpen, match: () => pathname.startsWith("/minimax/docs") },
-    { href: "/minimax/settings", label: "连接设置", icon: ShieldCheck, match: () => pathname.startsWith("/minimax/settings") },
+    { href: "/minimax/settings", label: "运行参数", icon: ShieldCheck, match: () => pathname.startsWith("/minimax/settings") },
   ];
   return (
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 flex-col bg-[#121826] text-slate-200 md:flex">

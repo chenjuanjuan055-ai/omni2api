@@ -12,6 +12,18 @@
 
 ## 功能
 
+**已接入的上游（同一个网关内）**
+
+| 上游 | 模型 | 说明 |
+|---|---|---|
+| **GPT** | 对话 / 图片 / 文件 | 基座能力，/v1/* 全套 OpenAI 兼容接口 |
+| **Grok** | grok-4.7 等 | 号池 4879+ 账号，账号池 / 密钥 / 出口 / 审计 / 媒体统一在控制台管理 |
+| **MiniMax** | minimax-m3 / -m3-thinking / -agent / -image / -h3 等 | 号池 2181+ 账号，账号 / 密钥 / 模型 / 签到 / 图库 / 审计统一管理 |
+
+三个上游**共用同一个网关与同一个控制台**（http://127.0.0.1:8000/），顶部页签切换。
+每个上游的账号池、审计与签到仍由各自维护，控制台只做统一视图与操作代理。
+后续会持续接入更多上游。
+
 **基座能力（来自上游）**
 
 - OpenAI 兼容接口：`/v1/chat/completions`、`/v1/responses`、`/v1/messages`、`/v1/images/generations|edits`
@@ -130,6 +142,24 @@ sudo systemctl status chatgpt2api
 
 ---
 
+## 接入新上游
+
+新上游按同一套流程并进来，成为这个项目的一个功能模块：
+
+1. **源码**并入 upstreams/<name>/（排除 node_modules / dist / 二进制 / 运行时数据）
+2. **本机编译**，产物放 upstreams/<name>/backend/bin/，并加进 deploy/start_services.ps1
+3. **控制台接入**：
+   - services/<name>_console.py —— 上游 admin API 客户端
+   - pi/<name>.py —— 管理路由
+   - web/src/app/<name>/ —— 功能页
+   - product-switcher.tsx 加页签、pp-shell.tsx 加侧边栏
+4. **连接配置**放 data/<name>_console.json（不进仓库）
+5. **compose** 加对应 service，文档写进 docs/deployment-architecture.md
+
+页面上只呈现功能，不暴露连到哪个端口这类实现细节。
+
+---
+
 ## 配置说明
 
 所有配置都在 `config.json`，也可以通过管理接口修改。关键项：
@@ -199,7 +229,13 @@ sudo systemctl status chatgpt2api
 
 ```
 api/                  HTTP 路由（OpenAI 兼容 + 管理）
+  minimax.py            MiniMax 上游的管理端点
 services/             业务实现
+  minimax_console.py    minimax2api 的 admin API 客户端
+  grok_console.py       grok2api 的 admin API 客户端
+  endpoint_probe.py     上游可达性探测（不可达时立即失败，不空等）
+  ssh_tunnel.py         受管的 SSH 端口转发（带自动重连）
+  url_guard.py          远程图片 URL 的 SSRF 防护
   egress_service.py     出口池：健康探测 / 选路 / 失败切换
   account_health.py     账号健康分类 / 导入校验
   model_catalog_service.py  模型目录
@@ -211,7 +247,12 @@ services/             业务实现
   prompts_service.py    提示词库
   openai_backend_api.py 上游协议实现（对话 / 图片 / 文件）
 web/                  Next.js 管理界面
-deploy/               systemd / 安装脚本
+  src/app/grok/         Grok 功能页
+  src/app/minimax/      MiniMax 功能页
+upstreams/            合并进来的上游网关源码
+  grok2api/              Go 网关（Grok 号池）
+  minimax2api/           Go 网关（MiniMax 号池，含配套 cookie-fix 转发）
+deploy/               systemd / 安装脚本 / 统一启动脚本
 docs/                 专题文档（出口池、账号健康、可观测）
 test/                 单元测试
 ```

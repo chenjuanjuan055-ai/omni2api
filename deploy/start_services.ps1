@@ -15,8 +15,8 @@ param([switch]$Stop)
 $ErrorActionPreference = 'Continue'
 
 # Resolve paths relative to the repository root so the script works from any
-# checkout location.
-$Repo = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+# checkout location. $PSScriptRoot is <repo>\deploy, so one level up is the repo.
+$Repo = Split-Path $PSScriptRoot -Parent
 
 $services = @(
     @{ Name = 'chatgpt-pool-ng';  Exe = "$Repo\.venv\Scripts\python.exe"
@@ -30,9 +30,10 @@ $services = @(
     # minimax2api's own companion: rewrites the Bearer JWT into the
     # _token cookie the upstream agent.minimax.io expects, then forwards.
     # Same project, same machine - not an external dependency.
-    @{ Name = 'minimax-cookiefix'; Exe = 'python'
+    @{ Name = 'minimax-cookiefix'; Exe = "$Repo\.venv\Scripts\python.exe"
        Args = @('cookie_fix.py', '18099'); WorkDir = "$Repo\upstreams\minimax2api"
-       Log = "$Repo\upstreams\minimax2api\cookiefix"; Port = 18099 }    @{ Name = 'grok2api';        Exe = "$Repo\upstreams\grok2api\backend\bin\grok2api.exe"
+       Log = "$Repo\upstreams\minimax2api\cookiefix"; Port = 18099 }
+    @{ Name = 'grok2api';        Exe = "$Repo\upstreams\grok2api\backend\bin\grok2api.exe"
        Args = @('--config', 'config.yaml'); WorkDir = "$Repo\upstreams\grok2api"
        Log = "$Repo\upstreams\grok2api\run"; Port = 8002 }
     @{ Name = 'grok-register';    Exe = 'D:\xi\grok-register\.venv\Scripts\python.exe'

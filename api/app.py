@@ -45,7 +45,7 @@ def create_app() -> FastAPI:
             backup_service.stop()
             endpoint_probe.stop()
 
-    app = FastAPI(title="chatgpt-pool-ng", version=app_version, lifespan=lifespan)
+    app = FastAPI(title="omni2api", version=app_version, lifespan=lifespan)
     install_exception_handlers(app)
     app.add_middleware(
         CORSMiddleware,

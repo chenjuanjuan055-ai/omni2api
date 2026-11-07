@@ -7,7 +7,7 @@ import webConfig from "@/constants/common-env";
 import { parseChangelog, type ReleaseInfo } from "@/lib/release";
 
 const latestVersionUrl =
-  "https://raw.githubusercontent.com/chenjuanjuan055-ai/chatgpt-pool-ng/main/VERSION";
+  "https://raw.githubusercontent.com/chenjuanjuan055-ai/omni2api/main/VERSION";
 
 async function fetchLocalReleases(): Promise<ReleaseInfo[]> {
   const response = await fetch("/CHANGELOG.md", { cache: "no-store" });

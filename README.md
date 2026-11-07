@@ -1,6 +1,8 @@
-# ChatGPT 号池（chatgpt-pool-ng）
+# Omni2API（omni2api）
 
-把 ChatGPT 网页端能力封装成 OpenAI 兼容 API，并提供一个面向多账号的自托管控制台。
+**多上游聚合反代与自动化注册平台。**
+
+把 ChatGPT / Grok / MiniMax 等上游统一成一个 OpenAI 兼容网关，并提供面向多账号的号池治理与自动化注册控制台。持续接入更多上游。
 
 本项目在 [basketikun/chatgpt2api](https://github.com/basketikun/chatgpt2api)（MIT）v1.8.0 的基础上二次开发，重点补上三件事：**出口治理**（代理挂了不再整池瘫痪）、**账号治理**（死号识别与导入校验）、**可观测性**（指标 / 错误分类 / 告警 / 仪表盘）。
 
@@ -55,8 +57,8 @@
 ### 源码运行
 
 ```bash
-git clone https://github.com/chenjuanjuan055-ai/chatgpt-pool-ng.git chatgpt-pool-ng
-cd chatgpt-pool-ng
+git clone https://github.com/chenjuanjuan055-ai/omni2api.git omni2api
+cd omni2api
 
 python -m venv .venv
 .venv/bin/pip install curl-cffi fastapi pillow pybase64 python-multipart \

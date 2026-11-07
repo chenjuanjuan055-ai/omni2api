@@ -276,7 +276,7 @@ def _download_image_url(url: str) -> ImageInput:
     try:
         response = requests.get(
             source,
-            headers={"Accept": "image/*,*/*;q=0.8", "User-Agent": "chatgpt-pool-ng image fetcher"},
+            headers={"Accept": "image/*,*/*;q=0.8", "User-Agent": "omni2api image fetcher"},
             timeout=60,
             allow_redirects=True,
             **proxy_settings.build_session_kwargs(),

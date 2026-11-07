@@ -1,4 +1,4 @@
-# chatgpt-pool-ng —— 一个项目的三个部分。
+# omni2api —— 一个项目的三个部分。
 #
 # app         : Python 网关 + Next.js 控制台（chatgpt2api 基座）
 # grok2api    : Go 号池网关，源码在 upstreams/grok2api
@@ -7,15 +7,15 @@
 # 三个服务在同一个 compose 项目、同一个网络里，用服务名互相访问。
 # 一条 `docker compose up -d` 起全套。
 
-name: chatgpt-pool-ng
+name: omni2api
 
 services:
   app:
     build:
       context: .
       dockerfile: Dockerfile
-    image: chenjuanjuan055-ai/chatgpt-pool-ng:latest
-    container_name: chatgpt-pool-ng
+    image: chenjuanjuan055-ai/omni2api:latest
+    container_name: omni2api
     restart: unless-stopped
     ports:
       - "${CHATGPT_POOL_PORT:-3000}:80"
@@ -55,7 +55,7 @@ services:
       context: ./upstreams/grok2api
       dockerfile: Dockerfile
     image: chenjuanjuan055-ai/grok2api:local
-    container_name: chatgpt-pool-ng-grok2api
+    container_name: omni2api-grok2api
     restart: unless-stopped
     ports:
       - "${GROK2API_PORT:-8002}:8002"
@@ -76,7 +76,7 @@ services:
       context: ./upstreams/minimax2api
       dockerfile: Dockerfile
     image: chenjuanjuan055-ai/minimax2api:local
-    container_name: chatgpt-pool-ng-minimax2api
+    container_name: omni2api-minimax2api
     restart: unless-stopped
     ports:
       - "${MINIMAX2API_PORT:-8096}:8096"
@@ -96,7 +96,7 @@ services:
       context: ./upstreams/minimax2api
       dockerfile: Dockerfile
     image: chenjuanjuan055-ai/minimax2api:local
-    container_name: chatgpt-pool-ng-minimax-cookiefix
+    container_name: omni2api-minimax-cookiefix
     restart: unless-stopped
     command: ["python3", "/app/cookie_fix.py", "18099"]
     environment:

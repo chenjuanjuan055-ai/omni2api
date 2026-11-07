@@ -4,15 +4,15 @@
 # grok2api    : Go 号池网关（upstreams/grok2api）
 # minimax2api : Go 号池网关（upstreams/minimax2api）
 
-name: chatgpt-pool-ng-local
+name: omni2api-local
 
 services:
   app:
     build:
       context: .
       dockerfile: Dockerfile
-    image: chatgpt-pool-ng:local
-    container_name: chatgpt-pool-ng-local
+    image: omni2api:local
+    container_name: omni2api-local
     ports:
       - "8000:80"
     volumes:
@@ -51,8 +51,8 @@ services:
     build:
       context: ./upstreams/grok2api
       dockerfile: Dockerfile
-    image: chatgpt-pool-ng-grok2api:local
-    container_name: chatgpt-pool-ng-local-grok2api
+    image: omni2api-grok2api:local
+    container_name: omni2api-local-grok2api
     ports:
       - "8002:8002"
     volumes:
@@ -63,8 +63,8 @@ services:
     build:
       context: ./upstreams/minimax2api
       dockerfile: Dockerfile
-    image: chatgpt-pool-ng-minimax2api:local
-    container_name: chatgpt-pool-ng-local-minimax2api
+    image: omni2api-minimax2api:local
+    container_name: omni2api-local-minimax2api
     ports:
       - "8096:8096"
     volumes:
@@ -75,6 +75,6 @@ services:
     build:
       context: ./upstreams/minimax2api
       dockerfile: Dockerfile
-    image: chatgpt-pool-ng-minimax2api:local
-    container_name: chatgpt-pool-ng-local-minimax-cookiefix
+    image: omni2api-minimax2api:local
+    container_name: omni2api-local-minimax-cookiefix
     command: ["python3", "/app/cookie_fix.py", "18099"]

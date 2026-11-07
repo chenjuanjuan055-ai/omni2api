@@ -1,5 +1,5 @@
 [project]
-name = "chatgpt-pool-ng"
+name = "omni2api"
 version = "1.9.1+ng"
 description = "ChatGPT account pool with egress governance, account health and observability"
 readme = "README.md"

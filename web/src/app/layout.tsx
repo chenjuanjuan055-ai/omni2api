@@ -5,7 +5,7 @@ import { ThemeScript } from "@/components/theme-script";
 import { AppShell } from "@/components/app-shell";
 
 export const metadata: Metadata = {
-  title: "ChatGPT 号池",
+  title: "Omni2API",
   description: "ChatGPT account pool management dashboard",
 };
 

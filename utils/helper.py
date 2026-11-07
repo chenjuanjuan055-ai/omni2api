@@ -377,7 +377,7 @@ def _decode_message_image_url(value: object) -> tuple[bytes, str] | None:
     try:
         response = requests.get(
             source,
-            headers={"Accept": "image/*,*/*;q=0.8", "User-Agent": "chatgpt-pool-ng vision fetcher"},
+            headers={"Accept": "image/*,*/*;q=0.8", "User-Agent": "omni2api vision fetcher"},
             timeout=REMOTE_IMAGE_TIMEOUT_SECONDS,
             allow_redirects=True,
             **proxy_settings.build_session_kwargs(),

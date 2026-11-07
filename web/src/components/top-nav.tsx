@@ -162,7 +162,7 @@ export function TopNav() {
                 <span className="grid size-8 place-items-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground">
                   <Sparkles className="size-4" />
                 </span>
-                ChatGPT 号池
+                Omni2API
               </SheetTitle>
             </SheetHeader>
             <nav className="mt-6 flex flex-col gap-1">
@@ -196,7 +196,7 @@ export function TopNav() {
           </SheetContent>
         </Sheet>
         <Link href="/image" className="text-[15px] font-semibold tracking-tight">
-          ChatGPT 号池
+          Omni2API
         </Link>
         <HeaderActions className="ml-auto" />
       </header>
@@ -206,7 +206,7 @@ export function TopNav() {
           <span className="grid size-8 place-items-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground shadow-sm">
             <Sparkles className="size-4" />
           </span>
-          <span className="text-[15px] font-semibold tracking-tight">ChatGPT 号池</span>
+          <span className="text-[15px] font-semibold tracking-tight">Omni2API</span>
         </div>
         <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-2">
           {canvasHref ? (

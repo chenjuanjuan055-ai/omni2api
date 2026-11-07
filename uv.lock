@@ -144,7 +144,7 @@ wheels = [
 ]
 
 [[package]]
-name = "chatgpt-pool-ng"
+name = "omni2api"
 version = "1.9.1+ng"
 source = { virtual = "." }
 dependencies = [

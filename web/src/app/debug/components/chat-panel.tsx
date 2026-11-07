@@ -74,7 +74,7 @@ export function ChatPanel() {
   const [model, setModel] = useState("auto");
   const [models, setModels] = useState<string[]>(["auto"]);
   const [reasoningEffort, setReasoningEffort] = useState("");
-  const [input, setInput] = useState("你好，先记住我的项目叫 chatgpt-pool-ng。");
+  const [input, setInput] = useState("你好，先记住我的项目叫 omni2api。");
   const [selectedImages, setSelectedImages] = useState<SelectedImage[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [raw, setRaw] = useState<ChatCompletionResponse | null>(null);

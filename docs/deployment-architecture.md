@@ -3,7 +3,7 @@
 **一个项目，三个部分。** 不是「一个项目去连接另一个项目」。
 
 ```
-chatgpt-pool-ng/
+omni2api/
 ├── api/          Python 网关（chatgpt2api 基座）
 ├── services/     Python 服务层：号池 / 出口治理 / 可观测 / 控制台代理
 ├── web/          Next.js 控制台前端
@@ -17,7 +17,7 @@ chatgpt-pool-ng/
 
 | 服务 | 端口 | 说明 |
 |---|---|---|
-| chatgpt-pool-ng | 8000（容器内 80） | OpenAI 兼容 API + 控制台 |
+| omni2api | 8000（容器内 80） | OpenAI 兼容 API + 控制台 |
 | grok2api | 8002 | Grok 号池网关（Go） |
 | minimax2api | 8096 | MiniMax 号池网关（Go） |
 

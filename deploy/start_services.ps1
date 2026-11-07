@@ -1,7 +1,7 @@
 # Start every service of this project as DETACHED processes.
 #
 # Why detached: a background bash task is capped at 1 hour, and when the
-# runtime kills the task the service dies with it (chatgpt-pool-ng already
+# runtime kills the task the service dies with it (omni2api already
 # died that way once). Start-Process spawns a process that outlives the task.
 #
 # NOTE: keep this file ASCII-only. Windows PowerShell 5.1 mis-parses UTF-8
@@ -19,7 +19,7 @@ $ErrorActionPreference = 'Continue'
 $Repo = Split-Path $PSScriptRoot -Parent
 
 $services = @(
-    @{ Name = 'chatgpt-pool-ng';  Exe = "$Repo\.venv\Scripts\python.exe"
+    @{ Name = 'omni2api';  Exe = "$Repo\.venv\Scripts\python.exe"
        Args = @('main.py'); WorkDir = $Repo
        Log = "$Repo\_tmp\server"; Port = 8000 }
     # The two Go upstream pools live in upstreams/ and run locally: the console

@@ -49,7 +49,7 @@ def list_models() -> dict[str, Any]:
                 "id": model,
                 "object": "model",
                 "created": 0,
-                "owned_by": "chatgpt-pool-ng",
+                "owned_by": "omni2api",
                 "permission": [],
                 "root": model,
                 "parent": None,

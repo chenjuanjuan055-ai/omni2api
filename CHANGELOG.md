@@ -7,7 +7,7 @@
 - 设置：新增 `gif_models` 白名单（默认三个 2.6 模型），控制台设置页可逐项勾选
 - 校验：GIF 请求要求模型在白名单内，且不支持 `stream`
 
-本项目（ChatGPT 号池 / chatgpt-pool-ng）在 [basketikun/chatgpt2api](https://github.com/basketikun/chatgpt2api) v1.8.0（MIT）基础上二次开发，以下为本项目自己的版本记录。
+本项目（ChatGPT 号池 / omni2api）在 [basketikun/chatgpt2api](https://github.com/basketikun/chatgpt2api) v1.8.0（MIT）基础上二次开发，以下为本项目自己的版本记录。
 
 ## 1.9.0 - 2026-10-28
 

@@ -354,6 +354,7 @@ export default function MinimaxAccountsPage() {
                   <th className="px-4 py-3 font-normal">区域</th>
                   <th className="px-4 py-3 font-normal">状态</th>
                   <th className="px-4 py-3 font-normal">并发</th>
+                  <th className="px-4 py-3 font-normal">优先级</th>
                   <th className="px-4 py-3 font-normal">最近使用</th>
                   <th className="px-4 py-3 font-normal">操作</th>
                 </tr>
@@ -384,8 +385,48 @@ export default function MinimaxAccountsPage() {
                         </td>
                         <td className="px-4 py-3 text-xs">{account.kind || "-"}</td>
                         <td className="px-4 py-3 text-xs">{account.region || "-"}</td>
-                        <td className={`px-4 py-3 text-xs ${STATUS_STYLE[status] || "text-stone-500"}`}>{status || "-"}</td>
-                        <td className="px-4 py-3 text-xs">{account.maxConcurrent ?? "-"}</td>
+                        <td className={`px-4 py-3 text-xs ${STATUS_STYLE[status] || "text-stone-500"}`}>
+                          <div className="flex items-center gap-1.5">
+                            <span>{status || "-"}</span>
+                            {account.cooldownUntil ? (
+                              <span className="text-amber-500">
+                                冷却至 {String(account.cooldownUntil).slice(5, 16).replace("T", " ")}
+                              </span>
+                            ) : null}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-xs">
+                          <div className="flex items-center gap-1">
+                            <Input
+                              defaultValue={String(account.maxConcurrent ?? 1)}
+                              onBlur={(e) => {
+                                const next = Number(e.target.value.replace(/\D/g, "")) || 1;
+                                if (next !== account.maxConcurrent) {
+                                  void runJob("保存并发", () =>
+                                    minimaxAccountUpdate(String(account.id), { maxConcurrent: next }),
+                                  );
+                                }
+                              }}
+                              className="h-7 w-14 px-2 text-xs"
+                            />
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-xs">
+                          <div className="flex items-center gap-1">
+                            <Input
+                              defaultValue={String(account.priority ?? 0)}
+                              onBlur={(e) => {
+                                const next = Number(e.target.value.replace(/\D/g, "")) || 0;
+                                if (next !== account.priority) {
+                                  void runJob("保存优先级", () =>
+                                    minimaxAccountUpdate(String(account.id), { priority: next }),
+                                  );
+                                }
+                              }}
+                              className="h-7 w-14 px-2 text-xs"
+                            />
+                          </div>
+                        </td>
                         <td className="px-4 py-3 text-xs">{String(account.lastUsedAt || "").slice(0, 19).replace("T", " ") || "-"}</td>
                         <td className="px-4 py-3">
                           <div className="flex gap-2">

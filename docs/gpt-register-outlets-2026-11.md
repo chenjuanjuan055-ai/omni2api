@@ -73,7 +73,42 @@ johngentrys53036f 的订阅 -> df.668fx.com:56512  密码 ca08129c-3ca4-4a35-…
 订阅里混着 `✅付费后可用全部线路`、`剩余流量：1020 MB`、`续费网址:…` 这类说明行，
 不过滤会生成一堆连不上的 proxy。
 
-### 4. 判"能不能注册"不能用 `cdn-cgi/trace`
+### 3.5 已有现成实例可以直接借用，别重复生成
+
+`D:\xi\tmp_9router\vv-proxy\` 里 9router 已经跑着一个 **VVCloud 多出口 mihomo**
+（mixed-port 8099，listeners 8099-8253，7 个账号 × 22 节点，每条节点一个本地端口，
+名字前缀是账号缩写，如 `johngent-专线A1-美国8-双ISP家宽IP`）。
+
+直接借它的端口当 ChatGPT 注册出口即可，**不要另起实例**（另起会把机场的连接配额吃掉，
+把唯一能用的窗口也挤掉）。实测可用：
+
+| 端口 | 节点 | 出口 IP |
+|---|---|---|
+| 8149 | juliawil-美国8-双ISP家宽IP | 38.175.211.10 (US, Cogent) |
+| 8169 | amandaho-美国4-家宽IP银行 | 38.76.151.53 (US, Cogent) |
+| 8191 | christin-美国4-家宽IP银行 | 38.76.151.53 (US, Cogent) |
+| 8193 | christin-美国8-双ISP家宽IP | 38.175.211.10 (US, Cogent) |
+| 8214 | johngent-美国5-家宽ChatGPT | 216.36.87.151 (US, GTT) |
+| 8215 | johngent-美国8-双ISP家宽IP | 38.175.211.10 (US, Cogent) |
+| 8237 | laurajoh-美国8-双ISP家宽IP | 38.175.211.10 (US, Cogent) |
+
+### 4. 试用节点的有效窗口只有几十秒 —— **不要先探测再注册**
+
+实测：`专线A1-美国4-家宽IP` 在探测时能拿到出口 IP（38.76.151.53 / US / Cogent），
+紧接着再跑注册就全部 `SSL_connect: Connection closed abruptly`。
+探一次活，就把那个窗口用掉了。
+
+⇒ **直接拿节点去注册**，让 turb 自己的重试机制顶（预检有 3 次退避重试），
+   不要在前面加"探活 + 选优"这一步。要选优就在**一次注册尝试内部**轮换端口。
+
+### 5. 试用账号里只有一部分的节点密码真正可用
+
+7 个 VVCloud 试用账号，同一条 `专线A1-美国4-家宽IP`：
+用 johngentrys53036f 的订阅能连，用其余 6 个的订阅全部 RST。
+⇒ 机场侧对"账号 + 节点密码"的组合有校验，不是"注册成功就都能用"。
+   真正能用的那个账号，一次只放行一条连接。
+
+### 6. 判"能不能注册"不能用 `cdn-cgi/trace`
 
 Cloudflare WARP / AWS / 机房 IP 全部能过 `GET https://chatgpt.com/cdn-cgi/trace`。
 真正的判据在 auth 侧：
@@ -115,7 +150,23 @@ PROXY_POOL_UPSTREAM_PROXY=        # 必须清空，否则会串上游
    `User is authenticated but not connected.`（这个错误只准判死号）。
    同一时刻 REST 直连每次都稳定拿到 20 封 ⇒ 用 `OUTLOOK_FETCH_MODE=graph`。
 
-## 四、入口
+## 四、判定邮箱是否处女：看服务端自己怎么说
+
+比翻收件箱更准的判据是 `email-otp/validate` 响应里的
+`oai-client-auth-session.email_verification_mode`：
+
+| 值 | 含义 | 后续页面 |
+|---|---|---|
+| `passwordless_signup` | **新邮箱，服务端在给你建号** | `about_you` → 建号完成 |
+| `passwordless_login` | 该邮箱已有账号，服务端在给你登录 | `mfa_challenge` / 登录页 |
+
+`passwordless_signup` 落到 `about_you` ⇒ 注册成功；`passwordless_login` 落到
+`mfa_challenge` ⇒ 该邮箱被人开过 TOTP，弃用。
+
+实测：`LutkinsSmolnicky1962@outlook.com` 走 `passwordless_signup` → `about_you`
+→ 建号成功（plan=free，带 access_token + refresh_token），导入主号池后真实对话验证通过。
+
+## 五、入口
 
 控制台：`http://127.0.0.1:8000/gpt/register` → 「自动注册」
 （内嵌 turb 的 WebUI，授权头 `x-auth-code: omni2api-local`）。

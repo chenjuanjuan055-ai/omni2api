@@ -288,9 +288,12 @@ def main() -> int:
         meta = gen_outlets(out, args.base_port, args.email_filter)
         start_mihomo(out)
 
+    # 试用节点的有效窗口只有几十秒：探测会把它耗掉。
+    # 这里探一次只是为了知道"有没有任何可用出口"，真正的选择留到注册时轮换。
     good = probe(meta)
     if not good:
-        log("[2] 没有过 CF 的出口，退出（VVCloud 试用流量可能已耗尽，等限流窗口过去再跑）")
+        log("[2] 当前没有过 CF 的出口。VVCloud 试用节点窗口很短 / 注册被限流（429 等 180 分钟），"
+            "过一会儿再跑本脚本即可。")
         return 2
 
     s = new_session()

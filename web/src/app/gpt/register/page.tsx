@@ -40,18 +40,25 @@ export default function GptRegisterPage() {
   const [registerCount, setRegisterCount] = useState(1);
   const [registerWorkers, setRegisterWorkers] = useState(1);
   const [jobs, setJobs] = useState<RegisterJob[]>([]);
+  const [pendingRt, setPendingRt] = useState<
+    Array<{ email: string; email_source?: string; has_rt: boolean }>
+  >([]);
 
   const load = useCallback(async () => {
     try {
-      const [s, c, j] = await Promise.all([
+      const [s, c, j, rt] = await Promise.all([
         httpRequest<Status>("/api/gpt-register/status"),
         httpRequest<CodexState>("/api/gpt-register/codex").catch(() => null),
         httpRequest<{ jobs?: RegisterJob[] } | RegisterJob[]>("/api/gpt-register/register/status")
           .catch(() => null),
+        httpRequest<{ items?: Array<{ email: string; email_source?: string; has_rt: boolean }> }>(
+          "/api/gpt-register/grant-rt/pending",
+        ).catch(() => null),
       ]);
       setStatus(s);
       setCodex(c);
       if (j) setJobs(Array.isArray(j) ? j : (j.jobs ?? []));
+      if (rt) setPendingRt(rt.items ?? []);
       setError("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "读取失败");
@@ -123,6 +130,52 @@ export default function GptRegisterPage() {
           <CardContent className="p-4 text-sm text-emerald-700">{notice}</CardContent>
         </Card>
       ) : null}
+
+      <Card className="rounded-2xl border-white/80 bg-white/90 shadow-sm">
+        <CardContent className="space-y-4 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-sm font-semibold text-stone-900">
+              <CircleAlert className="size-4 text-stone-400" />
+              凭据补全
+            </div>
+            <span className="text-xs text-stone-400">
+              注册出来的账号需要补一次长期凭据，才能自动续期
+            </span>
+          </div>
+          {pendingRt.filter((x) => !x.has_rt).length > 0 ? (
+            <div className="space-y-1.5">
+              {pendingRt
+                .filter((x) => !x.has_rt)
+                .map((x) => (
+                  <div
+                    key={x.email}
+                    className="flex flex-wrap items-center gap-2 rounded-xl bg-stone-50 px-3 py-2 text-xs text-stone-600"
+                  >
+                    <span className="font-mono">{x.email}</span>
+                    <span className="rounded-full bg-white px-2 py-0.5">{x.email_source ?? "-"}</span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={Boolean(busy)}
+                      onClick={() =>
+                        void act("补全凭据", () =>
+                          httpRequest("/api/gpt-register/grant-rt", {
+                            method: "POST",
+                            body: { email: x.email },
+                          }),
+                        )
+                      }
+                    >
+                      补全
+                    </Button>
+                  </div>
+                ))}
+            </div>
+          ) : (
+            <p className="text-xs text-stone-400">所有账号的长期凭据都齐全。</p>
+          )}
+        </CardContent>
+      </Card>
 
       <Card className="rounded-2xl border-white/80 bg-white/90 shadow-sm">
         <CardContent className="space-y-4 p-5">
@@ -316,7 +369,7 @@ export default function GptRegisterPage() {
             这里可以查看注册状态、巡检账号、触发 Codex 授权与归档。
           </p>
           <div className="flex flex-wrap gap-2">
-            {["纯协议注册", "指纹浏览器", "发起注册", "账号巡检", "Codex 授权", "凭据归档"].map((item) => (
+            {["纯协议注册", "指纹浏览器", "发起注册", "账号巡检", "凭据补全", "Codex 授权", "凭据归档"].map((item) => (
               <span
                 key={item}
                 className="rounded-full bg-stone-100 px-2.5 py-1 text-xs text-stone-600"

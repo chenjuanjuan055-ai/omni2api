@@ -125,7 +125,10 @@ class GptRegisterConsole:
         return data if isinstance(data, dict) else {"items": data}
 
     def start_register(self, count: int = 1, workers: int = 1) -> dict[str, Any]:
-        """发起一批自动注册任务（由注册机自己执行，控制台只下发参数与看进度）。"""
+        """发起一批自动注册任务（由注册机自己执行，控制台只下发参数与看进度）。
+
+        注册成功后由后台 watcher 自动补 OpenAI refresh_token（见 services/gpt_register_grant_rt.py）。
+        """
         try:
             n = max(1, min(int(count or 1), 20))
             w = max(1, min(int(workers or 1), 5))
@@ -134,6 +137,12 @@ class GptRegisterConsole:
         ok, data = self._try("/api/jobs", "POST", {"count": n, "workers": w}, timeout=120)
         if not ok:
             raise GptRegisterError(str(data))
+        try:
+            from services.gpt_register_grant_rt import gpt_register_grant_rt
+            gpt_register_grant_rt.start_watcher(self)
+            print("[gpt-register] 凭据补全 watcher 已启动", flush=True)
+        except Exception as exc:
+            print(f"[gpt-register] 凭据补全 watcher 启动失败: {type(exc).__name__}: {exc}", flush=True)
         return data if isinstance(data, dict) else {"ok": True, "raw": data}
 
     def register_status(self) -> dict[str, Any]:

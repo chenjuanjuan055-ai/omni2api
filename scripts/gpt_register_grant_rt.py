@@ -58,12 +58,63 @@ def api(method: str, path: str, **kw):
     return s.request(method, OMNI + path, headers=AUTH, timeout=kw.pop("timeout", 120), **kw)
 
 
+def _pick_proxy() -> str | None:
+    """从注册机的 .env 里读 PROXY_POOL，随机挑一个当出口。
+
+    注册机的 env_loader 会把字面 "\n" 也当分隔符，这里保持一致，
+    否则挑出来的会是一个把整串代理拼在一起的坏 URL。
+    """
+    import random
+    env_file = REPO / "upstreams" / "gpt-register" / ".env"
+    if not env_file.exists():
+        return None
+    pool: list[str] = []
+    for line in env_file.read_text(encoding="utf-8", errors="replace").splitlines():
+        s = line.strip()
+        if s.startswith("PROXY_POOL="):
+            raw = s.split("=", 1)[1].strip().strip('"').strip("'")
+            raw = raw.replace("\\r\\n", "\n").replace("\\n", "\n")
+            pool = [x.strip() for x in raw.split("\n") if x.strip()]
+            break
+    if not pool:
+        return None
+    # 试用节点的有效窗口很短，随机挑很容易挑到已经挂的出口。
+    # 先挨个探一下，选第一个能过 auth.openai.com 的。
+    healthy = [p for p in pool if _proxy_alive(p)]
+    if healthy:
+        return random.choice(healthy)
+    return random.choice(pool)
+
+
+def _proxy_alive(proxy: str, timeout: float = 8.0) -> bool:
+    """探一下代理能不能打通 auth.openai.com（403 也算通，说明只是没参数）。"""
+    try:
+        import requests
+        s = requests.Session()
+        s.trust_env = False
+        s.headers.update({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                                        "AppleWebKit/537.36 (KHTML, like Gecko) "
+                                        "Chrome/140.0.0.0 Safari/537.36"})
+        r = s.get("https://auth.openai.com/oauth/authorize",
+                  proxies={"http": proxy, "https": proxy},
+                  timeout=timeout, allow_redirects=False)
+        s.close()
+        return r.status_code != 403
+    except Exception:
+        return False
+
+
 def main() -> int:
     if len(sys.argv) < 2:
         print(__doc__)
         return 2
     email = sys.argv[1]
     proxy = sys.argv[2] if len(sys.argv) > 2 else None
+    if proxy is None:
+        # 没指定出口就用注册机自己的代理池（upstreams/gpt-register/.env 的 PROXY_POOL）
+        proxy = _pick_proxy()
+    if proxy:
+        print(f"[proxy] {proxy}")
 
     r = api("POST", "/api/accounts/oauth/start", json={"email_hint": email})
     print("[oauth/start]", r.status_code)

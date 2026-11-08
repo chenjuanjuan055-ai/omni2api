@@ -213,6 +213,39 @@ python scripts/gpt_register_grant_rt.py <email> [http://127.0.0.1:8215]
 实测：`a.bintan.s930@mail.go.id` 补完拿到 `rt.1.AADsSv3_QxbvLNIlLRvrRGp5y...`，
 进主号池后真实对话通过（quota=25）。
 
+## 四点六点五、控制台现在会自动补长期凭据
+
+注册机产出的号只有 access_token，必须再走一遍 OAuth 换到 `rt.1.` 才算"可长期使用"。
+这件事已经接进控制台，点一下发起注册就自动完成：
+
+```
+控制台「发起注册」
+   -> 注册机建号（拿到 access_token）
+   -> 后台 watcher 发现"这个账号在主号池里还没有 rt.1. 格式的凭据"
+   -> 自动走 omni2api 的 oauth/start + oauth/finish 补 rt
+   -> 账号带长期凭据进主号池
+```
+
+涉及的三块：
+
+| 位置 | 作用 |
+|---|---|
+| `services/gpt_register_grant_rt.py` | 自动补 rt 服务：扫注册机账号列表 → 找出缺 rt 的 → 调补 rt 脚本 → 落盘 |
+| `scripts/gpt_register_grant_rt.py` | 协议实现（子进程跑，用注册机自己的 venv） |
+| `api/gpt_register.py` | `POST /api/gpt-register/grant-rt`（手动补）、`GET /api/gpt-register/grant-rt/pending`（待补清单） |
+
+控制台页面有「凭据补全」卡片：列出缺凭据的账号，每行一个「补全」按钮。
+
+几个要注意的点：
+* **判定源用注册机的账号列表**（不是任务列表）—— 任务列表只留最近几条，
+  早先成功注册的账号不在里面，但账号一直在。
+* **代理要先探活**：试用节点的有效窗口只有几十秒，随机挑很容易挑到已经挂的出口，
+  所以挑之前挨个探一遍 `auth.openai.com`。
+* **失败重试有上限**（默认 3 次）：有些邮箱（例如已被绑 TOTP）永远补不上，
+  不限次数会一直死磕同一个。
+* `_handled` 集合的 key 要统一用小写：邮箱在 token 里是**首字母大写**的，
+  注册机账号表里也是大写，主号池里是小写。
+
 ## 四点七、控制台已能直接发起注册
 
 控制台的 **GPT 自动注册** 页（`/gpt/register`）现在能直接发起注册任务、看实时进度：

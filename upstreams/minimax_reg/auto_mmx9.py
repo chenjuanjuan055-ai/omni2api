@@ -144,12 +144,20 @@ def verify_exit(px):
 
     返回 (是否可用, 落地 IP)。代理池里死节点很多，不验一下会白跑一轮浏览器。
     """
-    port = POOL_MIXED
     node = str(px.get("node") or "")
+    # 本地额外出口（如 local-20200）用它自己的端口，不要当成池口
+    port = px.get("port") or POOL_MIXED
+    try:
+        port = int(port)
+    except Exception:
+        port = POOL_MIXED
     try:
         import urllib.request as _u
-        # ★ 先把出口切到这个节点（共享端口，选中谁决定出口）
-        if node:
+        # ★ 先把出口切到这个节点（共享端口，选中谁决定出口）。
+        #   注意：只有走本池 7896 的出口才需要切；
+        #   本机其它代理工具的端口（20200/10808 等）是独立出口，切 POOL 会 400。
+        _is_pool = (port == POOL_MIXED)
+        if node and _is_pool:
             try:
                 _req = _u.Request("http://127.0.0.1:%d/proxies/%s" % (POOL_CTL, POOL_GROUP),
                                   method="PUT",
@@ -213,6 +221,11 @@ def take_proxy():
               if not (st.get(str(x.get("node") or x.get("ip") or "")) or {}).get("used")]
     if _fresh:
         cands = _fresh + [x for x in cands if x not in _fresh]
+    # ★ 本机额外出口（Clash Verge / v2rayN 的高速线路、家宽）质量明显好于机场节点，
+    #   优先用它们 —— 机场节点那批 IP 段经常被目标站按段封。
+    _local = [x for x in cands if str(x.get("node") or "").startswith("local-")]
+    if _local:
+        cands = _local + [x for x in cands if x not in _local]
     _now = time.time()
     for x in cands:
         key = str(x.get("node") or x.get("ip") or "")

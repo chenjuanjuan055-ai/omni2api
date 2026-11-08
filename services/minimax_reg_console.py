@@ -43,6 +43,12 @@ POOL_CTRL_PORT = 9098
 V2RAY_PORT = 10808
 V2RAY_PROXY_NAME = "V2RAY-LOCAL"
 SPLIT_GOOGLE = False   # 见 _render_pool_cfg 的说明
+
+# ★ 本机其它代理工具的本地端口（当额外出口用）：
+#   它们和机场节点的 IP 段完全不同，目标站往往只封了其中一批。
+#   20200 = Clash Verge 的 mixed-port（23.237.50.x 高速线路，实测能用）
+#   10808 = v2rayN 的 mixed-port
+EXTRA_EXIT_PORTS = [20200, 20201, 10808, 8099]
 MINIMAX_DOMAINS = [
     "minimax.io", "minimaxi.com", "hailuoai.com", "hailuo.ai",
     "minimax.chat", "minimax.io.cn",
@@ -58,6 +64,8 @@ GOOGLE_DOMAINS = [
 POOL_SRC_CANDIDATES = [
     r"D:\xi\tmp_9router\vv-proxy\config.yaml",
     r"D:\xi\Documents\Hermes\minimax_reg\sweep_pool.yaml",
+    # ★ 精品高速线路（Clash Verge 在用的那套，IP 段质量明显好于机场节点）
+    r"D:\反代项目集\05_新项目\_mihomo\residential_1031.yaml",
 ]
 
 DEFAULT_PYTHON = r"C:\Users\xi\AppData\Local\Programs\Python\Python312\python.exe"
@@ -218,19 +226,22 @@ class MinimaxRegConsole:
         except Exception:
             return False
 
-    def _pool_source(self, s: dict[str, Any]) -> Path | None:
+    def _pool_source(self, s: dict[str, Any]) -> list[Path]:
+        """出口池源配置（支持逗号分隔的多个文件，proxies 段会合并）。"""
         cands: list[Path] = []
         raw = str(s.get("pool_config") or "").strip()
         if raw:
-            cands.append(Path(raw))
-        cands.extend(Path(x) for x in POOL_SRC_CANDIDATES)
+            cands.extend(Path(x.strip()) for x in raw.split(",") if x.strip())
+        if not cands:
+            cands.extend(Path(x) for x in POOL_SRC_CANDIDATES)
+        out: list[Path] = []
         for p in cands:
             try:
-                if p.exists() and p.is_file():
-                    return p
+                if p.exists() and p.is_file() and p not in out:
+                    out.append(p)
             except Exception:
                 continue
-        return None
+        return out
 
     @staticmethod
     def _proxy_names(txt: str) -> list[str]:
@@ -245,13 +256,41 @@ class MinimaxRegConsole:
                 break
             if not in_sec:
                 continue
-            m = re.match(r'^\s*- name:\s*"?([^"\n]+)"?\s*$', line)
+            # ★ 两种写法都要认：
+            #   "- name: xxx"（列表项开头）
+            #   "  name: xxx" （条目末尾，mihomo 也允许，residential_1031.yaml 就是这种）
+            m = re.match(r'^\s*(?:-\s*)?name:\s*"?([^"\n]+)"?\s*$', line)
             if m:
                 out.append(m.group(1).strip())
         return out
 
+    @staticmethod
+    def _split_proxy_entries(block: str) -> list[str]:
+        """把 proxies 段拆成一个个条目（以 "- " 开头的块）。"""
+        out: list[str] = []
+        cur: list[str] = []
+        for line in block.splitlines():
+            if line.startswith("- ") and cur:
+                out.append("\n".join(cur) + "\n")
+                cur = [line]
+            elif line.startswith("- "):
+                cur = [line]
+            elif cur:
+                cur.append(line)
+        if cur:
+            out.append("\n".join(cur) + "\n")
+        return out
+
+    @staticmethod
+    def _entry_name(chunk: str) -> str:
+        """取一个 proxy 条目的名字（支持 "- name:" 与条目末尾 "name:" 两种写法）。"""
+        import re
+        m = re.search(r'^\s*(?:-\s*)?name:\s*"?([^"\n]+)"?\s*$',
+                      chunk, flags=re.M)
+        return m.group(1).strip() if m else ""
+
     @classmethod
-    def _render_pool_cfg(cls, src_text: str) -> str:
+    def _render_pool_cfg(cls, src_text: str | list[str]) -> str:
         """把源配置改造成"共享端口 + rules 分流"的出口池。
 
         ★ 为什么要分流：
@@ -266,17 +305,34 @@ class MinimaxRegConsole:
           注册是串行的，不会互相打架。
         """
         import re
-        # ① 抠出源配置里的 proxies 段（整段照搬）
-        m = re.search(r"^proxies:\s*$", src_text, flags=re.M)
-        proxies_block = ""
+        if isinstance(src_text, str):
+            src_text = [src_text]
+        # ① 逐条抠出每个源配置的 proxies 条目，多源合并：
+        #    - 按名字去重（mihomo 不允许重名，否则启动直接 fatal）
+        #    - 剔除带 dialer-proxy 的条目（它依赖源配置里的 proxy-group，
+        #      我们不合并 group，带过去会 "dialer-proxy not found"）
+        chunks: list[str] = []
         names: list[str] = []
-        if m:
-            rest = src_text[m.end():]
+        seen_names: set[str] = set()
+        for one in src_text:
+            m = re.search(r"^proxies:\s*$", one, flags=re.M)
+            if not m:
+                continue
+            rest = one[m.end():]
             nxt = re.search(r"^[A-Za-z\-]+:", rest, flags=re.M)
-            proxies_block = rest[:nxt.start()] if nxt else rest
-            names = cls._proxy_names(src_text)
+            block = rest[:nxt.start()] if nxt else rest
+            for chunk in cls._split_proxy_entries(block):
+                nm = cls._entry_name(chunk)
+                if not nm or nm in seen_names:
+                    continue
+                if "dialer-proxy" in chunk:
+                    continue
+                seen_names.add(nm)
+                names.append(nm)
+                chunks.append(chunk)
+        proxies_block = "".join(chunks)
         if not names:
-            return src_text
+            return src_text[0] if src_text else ""
 
         head = [
             "mixed-port: %d" % POOL_MIXED_PORT,
@@ -428,7 +484,46 @@ class MinimaxRegConsole:
             return "", "", 0
         return ip, country, ms
 
-    def _probe_pool(self, names: list[str], limit: int = 60) -> bool:
+    @staticmethod
+    def _probe_local_exit(port: int, timeout: float = 12.0) -> tuple[str, str, int]:
+        """测本机另一个代理工具的本地端口（Clash Verge / v2rayN 等）。"""
+        import re
+        import time as _t
+        import urllib.request as u
+        op = u.build_opener(u.ProxyHandler({
+            "http": "http://127.0.0.1:%d" % port,
+            "https": "http://127.0.0.1:%d" % port,
+        }))
+        ip = ""
+        country = ""
+        try:
+            r = op.open(u.Request("http://ip-api.com/json/?fields=query,country",
+                                  headers={"User-Agent": "Mozilla/5.0 Chrome/140.0.0.0"}),
+                        timeout=timeout)
+            body = r.read(400).decode("utf-8", "replace")
+            m = re.search(r'"query"\s*:\s*"([^"]+)"', body)
+            if m:
+                ip = m.group(1)
+            m = re.search(r'"country"\s*:\s*"([^"]+)"', body)
+            if m:
+                country = m.group(1)
+        except Exception:
+            return "", "", 0
+        if not ip:
+            return "", "", 0
+        try:
+            t0 = _t.time()
+            r = op.open(u.Request("https://agent.minimax.io/",
+                                  headers={"User-Agent": "Mozilla/5.0 Chrome/140.0.0.0"}),
+                        timeout=timeout + 5)
+            ms = int((_t.time() - t0) * 1000)
+            if r.status != 200:
+                return "", "", 0
+        except Exception:
+            return "", "", 0
+        return ip, country, ms
+
+    def _probe_pool(self, names: list[str], limit: int = 30) -> bool:
         """逐个切 POOL 节点探活，写 px_live.json（按落地 IP 去重，按速度排序）。
 
         ★ 必须串行：共享端口上切节点是全局动作，并发会互相踩。
@@ -436,7 +531,7 @@ class MinimaxRegConsole:
         """
         import re
         cands = [n for n in names if n and n != V2RAY_PROXY_NAME]
-        us = [n for n in cands if re.search(r"美国|US|家宽|States", n)]
+        us = [n for n in cands if re.search(r"美国|US|家宽|States|高速", n)]
         rest = [n for n in cands if n not in us]
         pick = us + rest
         if len(pick) > limit:
@@ -463,6 +558,25 @@ class MinimaxRegConsole:
         #   然后**随机打乱**：老是拿最快的几个出口，很快就会被
         #   MiniMax 按 IP 限流（同一出口注册几次后 oauth2/login 就 403）。
         good.sort(key=lambda x: x.get("ms") or 999999)
+
+        # ★ 再把本机其它代理工具的本地端口测一遍，当额外出口。
+        #   它们和机场节点不是一个 IP 段，目标站封了一批不影响另一批。
+        for _port in EXTRA_EXIT_PORTS:
+            _ip, _cty, _ms = self._probe_local_exit(_port)
+            if not _ip:
+                continue
+            if _ip in seen:
+                continue
+            seen.add(_ip)
+            good.append({
+                "ip": _ip, "country": _cty, "ms": _ms,
+                "url": "http://127.0.0.1:%d" % _port,
+                "name": "local-%d" % _port,
+                "node": "local-%d" % _port,
+                "port": _port,
+            })
+            self._log("  · %-16s %5dms  本机代理口 %d" % (_ip, _ms, _port))
+
         import random as _rnd
         _rnd.shuffle(good)
         try:
@@ -488,16 +602,20 @@ class MinimaxRegConsole:
         import shutil
         import subprocess as sp
 
-        src = self._pool_source(s)
-        if not src:
+        srcs = self._pool_source(s)
+        if not srcs:
             self._log("没有出口池配置（可在设置里填 pool_config），本次用单出口")
             return False
-        try:
-            src_text = src.read_text(encoding="utf-8", errors="replace")
-        except Exception as exc:
-            self._log("出口池配置读不出来：%s" % exc)
+        src_texts = []
+        for src in srcs:
+            try:
+                src_texts.append(src.read_text(encoding="utf-8", errors="replace"))
+            except Exception as exc:
+                self._log("出口池配置读不出来：%s" % exc)
+        if not src_texts:
             return False
-        want = self._render_pool_cfg(src_text)
+        src = srcs[0]
+        want = self._render_pool_cfg(src_texts)
         want_hash = hashlib.md5(want.encode("utf-8")).hexdigest()
         try:
             POOL_DIR.mkdir(parents=True, exist_ok=True)

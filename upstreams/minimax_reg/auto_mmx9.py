@@ -113,11 +113,18 @@ def load_candidates():
         node = str(x.get("node") or x.get("name") or "")
         if node:
             seen_ports.add(node)
+        # ★ port 要保留原值：本机额外出口（local-20200 / local-10808）
+        #   端口不是池口，统一改成 POOL_MIXED 会被误当池口去切 POOL（400），
+        #   结果这些"不同 IP 段"的出口永远用不上。
+        try:
+            _pt = int(x.get("port") or POOL_MIXED)
+        except Exception:
+            _pt = POOL_MIXED
         out.append({
             "ip": x.get("ip") or "",
-            "url": x.get("url") or ("http://127.0.0.1:%d" % POOL_MIXED),
+            "url": x.get("url") or ("http://127.0.0.1:%d" % _pt),
             "node": node,
-            "port": POOL_MIXED,
+            "port": _pt,
         })
     try:
         ports = json.load(open(PX_PORTS, encoding="utf-8"))
@@ -226,6 +233,11 @@ def take_proxy():
     _local = [x for x in cands if str(x.get("node") or "").startswith("local-")]
     if _local:
         cands = _local + [x for x in cands if x not in _local]
+    # ★ "高速"线路节点也靠前：它们来自不同的中转商，IP 段分散，
+    #   目标站整段封禁时这一批往往还活着。
+    _hi = [x for x in cands if "高速" in str(x.get("node") or "")]
+    if _hi:
+        cands = _hi + [x for x in cands if x not in _hi]
     _now = time.time()
     for x in cands:
         key = str(x.get("node") or x.get("ip") or "")

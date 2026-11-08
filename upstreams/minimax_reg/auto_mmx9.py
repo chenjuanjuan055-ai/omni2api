@@ -230,14 +230,17 @@ def take_proxy():
         cands = _fresh + [x for x in cands if x not in _fresh]
     # ★ 本机额外出口（Clash Verge / v2rayN 的高速线路、家宽）质量明显好于机场节点，
     #   优先用它们 —— 机场节点那批 IP 段经常被目标站按段封。
+    # ★ 优先级：本机额外出口（Clash Verge / v2rayN，独立 IP 段，质量最高）
+    #   > "高速"线路节点（不同中转商，IP 段分散）
+    #   > 其它机场节点（成段被封）
     _local = [x for x in cands if str(x.get("node") or "").startswith("local-")]
-    if _local:
-        cands = _local + [x for x in cands if x not in _local]
-    # ★ "高速"线路节点也靠前：它们来自不同的中转商，IP 段分散，
-    #   目标站整段封禁时这一批往往还活着。
+    # 按端口升序：20200(Clash Verge 高速线路) 排在 10808(v2rayN) 前面，
+    # 实测 20200 的出口 IP 段更干净
+    _local.sort(key=lambda x: int(x.get("port") or 0))
     _hi = [x for x in cands if "高速" in str(x.get("node") or "")]
-    if _hi:
-        cands = _hi + [x for x in cands if x not in _hi]
+    _pri = _local + _hi
+    if _pri:
+        cands = _pri + [x for x in cands if x not in _pri]
     _now = time.time()
     for x in cands:
         key = str(x.get("node") or x.get("ip") or "")

@@ -784,8 +784,21 @@ async def main():
     ok = 0
     t0 = time.time()
 
-    for i in range(total):
+    # ★ 失败不消耗账号名额：换出口重试同一个账号（最多 MAX_TRIES 次）。
+    #   出口会被 MiniMax 按 IP 限流（同一出口注册几次后 oauth2/login 就 403），
+    #   换个出口往往就能成。
+    MAX_TRIES = 3
+    i = 0
+    tries = 0
+    while i < total:
         tag = "[w%02d]" % i
+        tries += 1
+        if tries > MAX_TRIES:
+            log("%s 重试 %d 次仍失败，换下一个账号" % (tag, MAX_TRIES))
+            i += 1
+            tries = 0
+            await asyncio.sleep(8)
+            continue
         try:
             m = requests.post(BRIDGE + "/mail", json={}, timeout=60).json()
             email = m.get("email")
@@ -1510,14 +1523,16 @@ async def main():
                         f.write(token + "\n")
                     log("%s ★★★ 成功！%s" % (tag, email))
                     ok += 1
+                    i += 1
+                    tries = 0
                 else:
-                    log("%s ✗ 没 token" % tag)
+                    log("%s ✗ 没 token（换出口重试 %d/%d）" % (tag, tries, MAX_TRIES))
 
         except Exception as e:
             log("%s 异常 %s" % (tag, repr(e)[:120]))
 
-        if i < total - 1:
-            await asyncio.sleep(15)
+        if i < total:
+            await asyncio.sleep(8)
 
     dt = time.time() - t0
     log("")

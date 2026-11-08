@@ -152,7 +152,7 @@ class MinimaxRegConsole:
         env["MMX_TOKEN_ONLY_FILE"] = str(DATA_DIR / "minimaxtoken_only.txt")
         # ★ 看门狗必须按数量放大：注册是串行的，一个约 90~180 秒，
         #   跑 5 个接近 15 分钟；固定值会把跑到一半的账号腰斩掉。
-        env["MMX_WATCHDOG_SECS"] = str(180 + 200 * max(1, int(count or 1)))
+        env["MMX_WATCHDOG_SECS"] = str(300 + 300 * max(1, int(count or 1)))
         # 出口池是共享的，别让注册脚本的看门狗把它杀掉
         env["MMX_KILL_MIHOMO"] = "0"
         # ★ 子进程 stdout 走管道时默认用系统 ANSI 编码（GBK），

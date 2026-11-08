@@ -48,3 +48,4 @@ upstreams/gpt-register/.env
 upstreams/gpt-register/Default-all-domains-*.json
 upstreams/gpt-register/are-capture-*.jsonl
 upstreams/gpt-register/accounts/
+upstreams/gpt-register/webui.*.log

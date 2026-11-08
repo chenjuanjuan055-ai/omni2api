@@ -526,20 +526,19 @@ async def page_form(page) -> dict:
 
 
 async def check_terms(page) -> bool:
-    """勾选协议（写法与实测能work的对照实验完全一致）。
+    """勾选协议。
 
-    ★ 对照实验结论（同一出口、同一流程，8 组）：
-        勾了条款 → oauth2/login 200；没勾 → 连请求都不发。
-      所以这一步是整个注册流程的成败关键。
-    ★ 定位：从 "I have read" 文本往上找 3 层祖先，
-      在每层里取第一个 10~24px 的按钮。
-      （别用泛化选择器：button[data-state] 会命中 "Sign up/Sign in" 切换 tab，
-        点到就把页面切到登录表单，提交直接 403。）
-    ★ 用真实鼠标坐标点击（JS .click() 对这个方块不生效）。
-    ★ 不做幂等判断：每个页面只勾一次（⑥ 登录页 / ⑧ 密码页 / ⑪ 验证码页，
-      换页后条款本来就是重置的）。
+    ★ 用 Playwright 的**元素点击**（自动 scrollIntoView + 命中测试），
+      坐标点击（page.mouse.click(x, y)）会概率性点空 ——
+      表现为"条款没勾上 → 连 oauth2/login 都不发"，页面毫无反应。
+    ★ 定位：以 "I have read" 文本为锚点，往上找 3 层祖先，
+      在每层里取第一个 10~24px 的 <button>（和实测能work的写法一致）。
+      别用泛化选择器：button[data-state] 会命中 "Sign up / Sign in" 切换 tab，
+      点到就把页面切到登录表单，提交直接 403。
+    ★ 不做幂等判断：每个页面只勾一次（换页后条款本来就是重置的）。
     """
-    box = await page.evaluate("""() => {
+    idx = await page.evaluate("""() => {
+        const btns = [...document.querySelectorAll('button')];
         for (const e of document.querySelectorAll('*')) {
             const t = (e.textContent || '').trim();
             if (t.startsWith('I have read') && t.length < 150) {
@@ -548,20 +547,52 @@ async def check_terms(page) -> bool:
                     for (const b of row.querySelectorAll('button')) {
                         const r = b.getBoundingClientRect();
                         if (r.width >= 10 && r.width <= 24)
-                            return {x: r.x + r.width/2, y: r.y + r.height/2};
+                            return btns.indexOf(b);
                     }
                     row = row.parentElement;
                 }
             }
         }
-        return null;
+        return -1;
     }""")
-    if not box:
+    if idx is None or idx < 0:
         return False
-    await safe_mouse(page, "move", box["x"], box["y"], steps=4)
-    await page.wait_for_timeout(300)
-    await safe_mouse(page, "click", box["x"], box["y"])
-    await page.wait_for_timeout(1000)
+    ok = False
+    try:
+        btns = page.locator('button')
+        if idx < await btns.count():
+            await btns.nth(idx).click(timeout=6000, force=True)
+            ok = True
+    except Exception:
+        ok = False
+    if not ok:
+        # 兜底：坐标点击
+        try:
+            box = await page.evaluate("""() => {
+                const btns = [...document.querySelectorAll('button')];
+                for (const e of document.querySelectorAll('*')) {
+                    const t = (e.textContent || '').trim();
+                    if (t.startsWith('I have read') && t.length < 150) {
+                        let row = e;
+                        for (let i = 0; i < 3 && row; i++) {
+                            for (const b of row.querySelectorAll('button')) {
+                                const r = b.getBoundingClientRect();
+                                if (r.width >= 10 && r.width <= 24)
+                                    return {x: r.x + r.width/2, y: r.y + r.height/2};
+                            }
+                            row = row.parentElement;
+                        }
+                    }
+                }
+                return null;
+            }""")
+            if box:
+                await safe_mouse(page, "move", box["x"], box["y"], steps=4)
+                await page.wait_for_timeout(250)
+                await safe_mouse(page, "click", box["x"], box["y"])
+        except Exception:
+            pass
+    await page.wait_for_timeout(900)
     return True
 
 

@@ -714,6 +714,47 @@ def navigate_about_you(session: BrowserSession, about_url: str | None = None) ->
     return final_url
 
 
+def send_passwordless_otp(
+    session: BrowserSession,
+    sentinel_header: str | None = None,
+    so_header: str | None = None,
+) -> dict:
+    """触发 OpenAI 免密邮箱验证码（2026-11 现网流程）。
+
+    旧端点 ``GET /api/accounts/email-otp/send`` 已下线，命中 SPA 兜底会返回 200 的
+    HTML（看起来"成功"但并不会真的发码）。现网端点是
+    ``POST /api/accounts/passwordless/send-otp``，返回体里带
+    ``page.type=email_otp_verification`` 与 ``email_verification_mode``。
+    """
+    url = "https://auth.openai.com/api/accounts/passwordless/send-otp"
+    headers = session.get_auth_headers(referer="https://auth.openai.com/")
+    # 该端点只接受 application/json（沿用默认的 x-www-form-urlencoded 会被 400 拒绝）
+    headers["content-type"] = "application/json"
+    headers["sec-fetch-site"] = "same-origin"
+    if sentinel_header:
+        headers["openai-sentinel-token"] = sentinel_header
+    if so_header:
+        headers["openai-sentinel-so-token"] = so_header
+    logger.info("[OTP] 请求触发免密邮箱验证码 (passwordless/send-otp)...")
+    resp = session.post(url, headers=headers)
+    if resp.status_code >= 400:
+        raise RuntimeError(
+            f"passwordless/send-otp 失败 status={resp.status_code}: {(resp.text or '')[:300]}"
+        )
+    try:
+        data = resp.json()
+    except Exception:
+        data = {}
+    page = data.get("page") if isinstance(data, dict) else {}
+    page = page if isinstance(page, dict) else {}
+    logger.info(
+        "[OTP] 免密发码成功 page_type=%s mode=%s",
+        page.get("type") or "空",
+        ((page.get("payload") or {}) or {}).get("email_verification_mode") or "空",
+    )
+    return data if isinstance(data, dict) else {}
+
+
 def send_email_otp(session: BrowserSession, referer: str = "https://auth.openai.com/email-verification") -> None:
     """重新发送邮箱验证码。用于验证码错误/过期后重新取码。"""
     url = "https://auth.openai.com/api/accounts/email-otp/send"

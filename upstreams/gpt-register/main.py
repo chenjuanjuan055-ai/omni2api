@@ -22,6 +22,7 @@ from core.chatgpt_auth import get_providers, get_csrf_token, signin_openai
 from core.openai_auth import (
     follow_authorize,
     request_sentinel_token,
+    send_passwordless_otp,
     build_sentinel_header,
     validate_email_otp,
     send_email_otp,
@@ -341,27 +342,13 @@ def run_registration(
         authorize_final_url = follow_authorize(session, authorize_url)
         human_delay("navigate")
 
-        # 步骤5-8: 强制走邮箱+密码注册，不使用 passwordless OTP-only 分支。
-        navigate_create_account_password(session, authorize_final_url)
-        human_delay("navigate")
-        registration_password = generate_registration_password()
-        password_sentinel = request_password_sentinel_bundle(session)
-        password_sentinel_header, password_so_header = build_sentinel_header(
-            session, password_sentinel, "username_password_create"
-        )
-        human_delay("challenge")
-        register_result = register_user(
-            session,
-            email,
-            registration_password,
-            password_sentinel_header,
-            password_so_header,
-        )
-        create_acknowledged = True
-
-        # 只读取本次发送之后到达的验证码，避免误取历史邮件。
+        # ==================== 阶段3: 邮箱验证码（2026-11 现网顺序）===================
+        # 现网顺序已从"先建密码账号再收码"改成"先收邮箱码，再由服务端决定要不要密码"：
+        #   authorize -> 落点 /email-verification -> POST /api/accounts/passwordless/send-otp
+        #   -> 校验码 -> 直接给 OAuth 回调（免密建号）或要求 /create-account/password。
+        # 旧顺序会让 user/register 恒回 400 {"code":"invalid_auth_step"}。
         otp_after_ts = time.time()
-        navigate_email_otp_send(session, register_result.get("continue_url"))
+        send_passwordless_otp(session)
         human_delay("navigate")
 
         # ==================== 阶段3: 验证码验证 ====================
@@ -432,6 +419,47 @@ def run_registration(
 
         # ==================== 阶段5/6: 完成注册或直接 OAuth 回调 ====================
         otp_continue_text = str(otp_continue_url or "")
+        # 现网也可能在校验码之后要求设置密码（continue_url 指向 /create-account/password）。
+        # 这时走"建密码账号 -> 再收一次码 -> OAuth 回调"。
+        if otp_continue_text and "/create-account/password" in otp_continue_text:
+            logger.info("[注册] OTP 后服务端要求设置密码，走创建密码账号分支")
+            navigate_create_account_password(session, otp_continue_text)
+            human_delay("navigate")
+            registration_password = generate_registration_password()
+            password_sentinel = request_password_sentinel_bundle(session)
+            password_sentinel_header, password_so_header = build_sentinel_header(
+                session, password_sentinel, "username_password_create"
+            )
+            human_delay("challenge")
+            register_result = register_user(
+                session,
+                email,
+                registration_password,
+                password_sentinel_header,
+                password_so_header,
+            )
+            create_acknowledged = True
+            # 旧端点 /api/accounts/email-otp/send 已下线，改用现网的 passwordless/send-otp
+            send_passwordless_otp(session)
+            human_delay("navigate")
+            otp_after_ts = time.time()
+            second_otp = None
+            if _email_cfg.USE_EMAIL_SERVICE:
+                second_otp = wait_for_otp(email, after_ts=otp_after_ts)
+            if second_otp:
+                validate_result = validate_email_otp(session, second_otp)
+                page = validate_result.get("page") if isinstance(validate_result, dict) else {}
+                page = page if isinstance(page, dict) else {}
+                otp_continue_url = (
+                    validate_result.get("continue_url")
+                    or validate_result.get("external_url")
+                    or page.get("continue_url")
+                    or page.get("external_url")
+                    or ""
+                )
+                otp_continue_text = str(otp_continue_url or "")
+                page_type = str(page.get("type") or "")
+
         direct_oauth_after_otp = bool(
             otp_continue_text
             and "about-you" not in otp_continue_text

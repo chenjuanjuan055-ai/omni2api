@@ -213,6 +213,30 @@ python scripts/gpt_register_grant_rt.py <email> [http://127.0.0.1:8215]
 实测：`a.bintan.s930@mail.go.id` 补完拿到 `rt.1.AADsSv3_QxbvLNIlLRvrRGp5y...`，
 进主号池后真实对话通过（quota=25）。
 
+## 四点七、控制台已能直接发起注册
+
+控制台的 **GPT 自动注册** 页（`/gpt/register`）现在能直接发起注册任务、看实时进度：
+
+```
+POST /api/gpt-register/register          {"count": N, "workers": M}
+GET  /api/gpt-register/register/status   -> {"jobs": [{email, display_status, error, ...}]}
+```
+
+链路：控制台 → `services/gpt_register_console.py` → 注册机的 `/api/jobs`。
+
+## 四点八、账号池按 access_token 建 key 的坑（已修）
+
+账号池 `self._accounts` 以 **access_token 为 key**。同一账号重新登录会换到新的
+access_token，于是旧条目（往往带着已失效的 refresh_token）留在池里，
+表现成同一邮箱出现两条，其中一条刷新必失败，最后被 `auto_remove_invalid_accounts`
+当成无效账号清掉 —— 看起来像"号莫名消失了"。
+
+修法两处：
+1. `services/account_service.py`：写入前按 email 去重，同邮箱的旧条目被新 token 顶替。
+2. `api/accounts.py` 的 `oauth/finish`：payload 补上 email / user_id / plan
+   （email 在 access_token 的 `https://api.openai.com/profile.email`，
+   或 id_token 顶层 `email`；注意邮箱是**首字母大写**的，比对时要 `.lower()`）。
+
 ## 五、入口
 
 控制台：`http://127.0.0.1:8000/gpt/register` → 「自动注册」

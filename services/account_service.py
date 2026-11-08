@@ -1228,6 +1228,21 @@ class AccountService:
             added = 0
             skipped = 0
             for access_token, payload in deduped.items():
+                # 同一邮箱换了新 access_token 时，顶掉旧条目，避免池里出现重复账号
+                # （旧条目往往带着已失效的 refresh_token，最后被自动清理误伤）。
+                email_key = str(payload.get("email") or "").strip().lower()
+                if email_key:
+                    for old_token, old_item in list(self._accounts.items()):
+                        if old_token == access_token:
+                            continue
+                        old_email = str(old_item.get("email") or "").strip().lower()
+                        if old_email and old_email == email_key:
+                            print(
+                                f"[account_pool] 同邮箱旧条目被新 token 顶替: {old_email} "
+                                f"({str(old_item.get('access_token'))[:16]}... -> {access_token[:16]}...)",
+                                flush=True,
+                            )
+                            self._accounts.pop(old_token, None)
                 current = self._accounts.get(access_token)
                 if current is None:
                     added += 1

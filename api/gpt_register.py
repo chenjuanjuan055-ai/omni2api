@@ -48,6 +48,30 @@ def create_router() -> APIRouter:
         except Exception as exc:
             raise _guard(exc) from exc
 
+    @router.post("/api/gpt-register/register")
+    async def start_register(
+            body: dict,
+            authorization: str | None = Header(default=None)):
+        """发起一批自动注册任务。"""
+        require_admin(authorization)
+        try:
+            return await run_in_threadpool(
+                gpt_register_console.start_register,
+                int(body.get("count") or 1),
+                int(body.get("workers") or 1),
+            )
+        except GptRegisterError as exc:
+            raise HTTPException(status_code=400, detail={"error": str(exc)}) from exc
+
+    @router.get("/api/gpt-register/register/status")
+    async def register_status(authorization: str | None = Header(default=None)):
+        """读取自动注册任务进度。"""
+        require_admin(authorization)
+        try:
+            return await run_in_threadpool(gpt_register_console.register_status)
+        except GptRegisterError as exc:
+            raise HTTPException(status_code=400, detail={"error": str(exc)}) from exc
+
     @router.get("/api/gpt-register/codex")
     async def codex_status(authorization: str | None = Header(default=None)):
         require_admin(authorization)

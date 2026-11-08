@@ -19,6 +19,17 @@ type Status = {
 
 type CodexState = Record<string, any>;
 
+type RegisterJob = {
+  id?: number | string;
+  status?: string;
+  state?: string;
+  email?: string;
+  note?: string;
+  error?: string;
+  done?: number;
+  total?: number;
+};
+
 export default function GptRegisterPage() {
   const { isCheckingAuth } = useAuthGuard(["admin"]);
   const [status, setStatus] = useState<Status | null>(null);
@@ -26,15 +37,21 @@ export default function GptRegisterPage() {
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [registerCount, setRegisterCount] = useState(1);
+  const [registerWorkers, setRegisterWorkers] = useState(1);
+  const [jobs, setJobs] = useState<RegisterJob[]>([]);
 
   const load = useCallback(async () => {
     try {
-      const [s, c] = await Promise.all([
+      const [s, c, j] = await Promise.all([
         httpRequest<Status>("/api/gpt-register/status"),
         httpRequest<CodexState>("/api/gpt-register/codex").catch(() => null),
+        httpRequest<{ jobs?: RegisterJob[] } | RegisterJob[]>("/api/gpt-register/register/status")
+          .catch(() => null),
       ]);
       setStatus(s);
       setCodex(c);
+      if (j) setJobs(Array.isArray(j) ? j : (j.jobs ?? []));
       setError("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "读取失败");
@@ -73,7 +90,7 @@ export default function GptRegisterPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-stone-900">GPT 自动注册</h1>
           <p className="mt-1 text-sm text-stone-500">
-            纯协议注册 + 指纹浏览器，支持 Codex 授权、CPA 批量导出与 Sub2API 上传
+            纯协议注册 + 指纹浏览器，支持发起注册、账号巡检、Codex 授权与凭据归档
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -106,6 +123,77 @@ export default function GptRegisterPage() {
           <CardContent className="p-4 text-sm text-emerald-700">{notice}</CardContent>
         </Card>
       ) : null}
+
+      <Card className="rounded-2xl border-white/80 bg-white/90 shadow-sm">
+        <CardContent className="space-y-4 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-sm font-semibold text-stone-900">
+              <Zap className="size-4 text-stone-400" />
+              发起注册
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="flex items-center gap-1 text-xs text-stone-500">
+                数量
+                <Input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={registerCount}
+                  onChange={(e) => setRegisterCount(Number(e.target.value) || 1)}
+                  className="w-16"
+                />
+              </label>
+              <label className="flex items-center gap-1 text-xs text-stone-500">
+                并发
+                <Input
+                  type="number"
+                  min={1}
+                  max={5}
+                  value={registerWorkers}
+                  onChange={(e) => setRegisterWorkers(Number(e.target.value) || 1)}
+                  className="w-16"
+                />
+              </label>
+              <Button
+                size="sm"
+                disabled={Boolean(busy)}
+                onClick={() =>
+                  void act("发起注册", () =>
+                    httpRequest("/api/gpt-register/register", {
+                      method: "POST",
+                      body: { count: registerCount, workers: registerWorkers },
+                    }),
+                  )
+                }
+              >
+                <Play className="size-4" />开始
+              </Button>
+            </div>
+          </div>
+          {jobs.length > 0 ? (
+            <div className="space-y-1.5">
+              {jobs.slice(0, 6).map((job, idx) => (
+                <div
+                  key={job.id ?? idx}
+                  className="flex flex-wrap items-center gap-2 rounded-xl bg-stone-50 px-3 py-2 text-xs text-stone-600"
+                >
+                  <span className="font-mono">{job.email ?? `任务 ${job.id ?? idx + 1}`}</span>
+                  <span className="rounded-full bg-white px-2 py-0.5">
+                    {job.status ?? job.state ?? "进行中"}
+                  </span>
+                  {job.done !== undefined && job.total !== undefined ? (
+                    <span>{job.done}/{job.total}</span>
+                  ) : null}
+                  {job.note ? <span className="text-stone-400">{job.note}</span> : null}
+                  {job.error ? <span className="text-rose-600">{job.error}</span> : null}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-stone-400">暂无进行中的注册任务。</p>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="rounded-2xl border-white/80 bg-white/90 shadow-sm lg:col-span-1">
@@ -221,17 +309,22 @@ export default function GptRegisterPage() {
       </div>
 
       <Card className="rounded-2xl border-white/80 bg-white/90 shadow-sm">
-        <CardContent className="space-y-2 p-5">
-          <div className="text-sm font-semibold text-stone-900">接入说明</div>
+        <CardContent className="space-y-3 p-5">
+          <div className="text-sm font-semibold text-stone-900">功能说明</div>
           <p className="text-sm text-stone-500">
-            注册机内置于本项目，随网关一同启动。完整面板（批量导出 CPA / 上传 Sub2API / 换邮箱 / 绑定 TOTP / 巡检）
-            在注册机自身页面，账号与凭据也由它自己管理 —— 控制台只做统一视图与常用操作。
+            注册机内置于本项目，随网关一同启动。账号与凭据由本项目统一管理，
+            这里可以查看注册状态、巡检账号、触发 Codex 授权与归档。
           </p>
-          <Input
-            readOnly
-            value="注册机面板由 turb-gpt-free-register 提供（Flask，默认 http://127.0.0.1:5000）"
-            className="font-mono text-xs"
-          />
+          <div className="flex flex-wrap gap-2">
+            {["纯协议注册", "指纹浏览器", "发起注册", "账号巡检", "Codex 授权", "凭据归档"].map((item) => (
+              <span
+                key={item}
+                className="rounded-full bg-stone-100 px-2.5 py-1 text-xs text-stone-600"
+              >
+                {item}
+              </span>
+            ))}
+          </div>
         </CardContent>
       </Card>
     </div>

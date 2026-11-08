@@ -21,7 +21,10 @@ Outlook 来源才有），不是 OpenAI 的 refresh_token（``rt.1....``）。
 
 用法
 ----
-    python scripts/gpt_register_grant_rt.py <email> [proxy]
+    python scripts/gpt_register_grant_rt.py <email> [proxy] [password]
+
+    落点是密码页时优先走免密发码（免密账号没有密码，password/verify 会 401），
+    免密失败才回退密码分支；密码可以显式传，也可以从注册机数据库里取。
 """
 from __future__ import annotations
 
@@ -43,6 +46,7 @@ from core.openai_auth import (  # noqa: E402
     request_password_sentinel_bundle, build_sentinel_header,
 )
 from core.email_provider import wait_for_otp  # noqa: E402
+from core.account_liveness import _password_verify, _account_registration_password  # noqa: E402
 
 OMNI = "http://127.0.0.1:8000"
 AUTH = {"Authorization": "Bearer chatgpt2api"}
@@ -76,35 +80,66 @@ def main() -> int:
     final = str(getattr(resp, "url", ""))
     print("[1] authorize 落点:", final)
 
-    if "email-verification" not in final:
-        print("  该邮箱不是免密注册分支（落点非 /email-verification），"
-              "需要走密码登录分支，本脚本不处理。")
-        return 3
+    continue_url = ""
+    if "log-in/password" in final:
+        # 免密账号也会落在密码页（服务端默认展示密码登录），但它其实没有密码
+        # => password/verify 会 401。所以优先走免密发码，失败再回退密码。
+        print("[2] 落点是密码页 -> 先试免密发码")
+        try:
+            ts = time.time()
+            send_passwordless_otp(s)
+            print("    已触发发码")
+            otp = wait_for_otp(email, after_ts=ts)
+            print("    收到 OTP:", otp)
+            vh = s.get_auth_headers(referer="https://auth.openai.com/email-verification")
+            v = s.post("https://auth.openai.com/api/accounts/email-otp/validate",
+                       headers=vh, data=json.dumps({"code": otp}))
+            vj = v.json() if v.text else {}
+            page = vj.get("page") or {}
+            print("    validate:", v.status_code, "page.type:", page.get("type"))
+            continue_url = vj.get("continue_url") or vj.get("external_url") or ""
+        except Exception as exc:
+            print("    免密分支失败:", type(exc).__name__, str(exc)[:160])
+            continue_url = ""
+        if not continue_url:
+            pwd = sys.argv[3] if len(sys.argv) > 3 else _account_registration_password(email)
+            if not pwd:
+                print("  免密与密码两条路都走不通（没有可用密码）")
+                return 3
+            print("[2b] 回退密码分支 -> POST /api/accounts/password/verify")
+            res = _password_verify(s, pwd)
+            print("    password/verify ->", json.dumps(res, ensure_ascii=False)[:300])
+            page = (res.get("page") or {}) if isinstance(res, dict) else {}
+            continue_url = res.get("continue_url") or res.get("external_url") or ""
+            if not continue_url and isinstance(page, dict):
+                continue_url = page.get("continue_url") or page.get("external_url") or ""
+    else:
+        ts = time.time()
+        send_passwordless_otp(s)
+        print("[2] 已触发发码")
+        otp = wait_for_otp(email, after_ts=ts)
+        print("[3] 收到 OTP:", otp)
 
-    ts = time.time()
-    send_passwordless_otp(s)
-    print("[2] 已触发发码")
-    otp = wait_for_otp(email, after_ts=ts)
-    print("[3] 收到 OTP:", otp)
+        bundle = request_password_sentinel_bundle(s)
+        tok = request_sentinel_token(s, "authorize_continue")
+        sent, so = build_sentinel_header(s, tok, "authorize_continue")
+        vh = s.get_auth_headers(referer="https://auth.openai.com/email-verification")
+        vh["openai-sentinel-token"] = sent
+        if so:
+            vh["openai-sentinel-so-token"] = so
+        v = s.post("https://auth.openai.com/api/accounts/email-otp/validate",
+                   headers=vh, data=json.dumps({"code": otp}))
+        print("[4] validate:", v.status_code)
+        try:
+            vj = v.json()
+        except Exception:
+            vj = {}
+        page = vj.get("page") or {}
+        print("    page.type:", page.get("type"), " mode:",
+              ((vj.get("oai-client-auth-session") or {}).get("email_verification_mode") or ""))
+        continue_url = vj.get("continue_url") or vj.get("external_url") or ""
 
-    bundle = request_password_sentinel_bundle(s)
-    tok = request_sentinel_token(s, "authorize_continue")
-    sent, so = build_sentinel_header(s, tok, "authorize_continue")
-    vh = s.get_auth_headers(referer="https://auth.openai.com/email-verification")
-    vh["openai-sentinel-token"] = sent
-    if so:
-        vh["openai-sentinel-so-token"] = so
-    v = s.post("https://auth.openai.com/api/accounts/email-otp/validate",
-               headers=vh, data=json.dumps({"code": otp}))
-    print("[4] validate:", v.status_code)
-    try:
-        vj = v.json()
-    except Exception:
-        vj = {}
-    page = vj.get("page") or {}
-    print("    page.type:", page.get("type"), " mode:",
-          ((vj.get("oai-client-auth-session") or {}).get("email_verification_mode") or ""))
-    cu = vj.get("continue_url") or vj.get("external_url") or ""
+    cu = continue_url
     if not cu:
         print("  没拿到 continue_url")
         return 4

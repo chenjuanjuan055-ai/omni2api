@@ -124,6 +124,27 @@ class GptRegisterConsole:
             raise GptRegisterError(str(data))
         return data if isinstance(data, dict) else {"items": data}
 
+    def start_register(self, count: int = 1, workers: int = 1) -> dict[str, Any]:
+        """发起一批自动注册任务（由注册机自己执行，控制台只下发参数与看进度）。"""
+        try:
+            n = max(1, min(int(count or 1), 20))
+            w = max(1, min(int(workers or 1), 5))
+        except (TypeError, ValueError) as exc:
+            raise GptRegisterError("数量或并发参数不合法") from exc
+        ok, data = self._try("/api/jobs", "POST", {"count": n, "workers": w}, timeout=120)
+        if not ok:
+            raise GptRegisterError(str(data))
+        return data if isinstance(data, dict) else {"ok": True, "raw": data}
+
+    def register_status(self) -> dict[str, Any]:
+        """读取当前注册任务进度。"""
+        ok, data = self._try("/api/jobs", "GET", None, timeout=30)
+        if not ok:
+            raise GptRegisterError(str(data))
+        if isinstance(data, dict):
+            return data
+        return {"jobs": data if isinstance(data, list) else []}
+
     def codex_status(self) -> dict[str, Any]:
         ok, data = self._try("/api/codex")
         if not ok:

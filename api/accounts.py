@@ -566,6 +566,36 @@ def create_router() -> APIRouter:
             "id_token": tokens["id_token"],
             "source_type": "oauth_login",
         }
+        # 把账号身份一起带上：账号池以 access_token 为 key，同一账号重新登录会换到
+        # 新 token；带上 email 才能让账号池识别出"同邮箱旧条目"并顶替它，
+        # 否则旧条目（往往带着已失效的 refresh_token）会留在池里变成重复账号。
+        try:
+            access_claims = account_service._decode_jwt_payload(tokens["access_token"])
+            id_claims = account_service._decode_jwt_payload(tokens.get("id_token") or "")
+            auth_claims = access_claims.get("https://api.openai.com/auth") or {}
+            profile_claims = access_claims.get("https://api.openai.com/profile") or {}
+            email = str(
+                profile_claims.get("email")
+                or id_claims.get("email")
+                or auth_claims.get("email")
+                or access_claims.get("email")
+                or ""
+            ).strip()
+            if email:
+                payload["email"] = email
+            user_id = str(
+                auth_claims.get("user_id")
+                or id_claims.get("https://api.openai.com/auth", {}).get("user_id")
+                or ""
+            ).strip()
+            if user_id:
+                payload["user_id"] = user_id
+            plan = str(auth_claims.get("chatgpt_plan_type") or "").strip()
+            if plan:
+                payload["plan_type"] = plan
+                payload["type"] = plan
+        except Exception as exc:  # 解不出来不影响主流程
+            print(f"[oauth-login] 解析 token 身份失败（忽略）: {exc}", flush=True)
         add_result = await run_in_threadpool(account_service.add_account_items, [payload])
         refresh_result = await run_in_threadpool(
             account_service.refresh_accounts, [tokens["access_token"]]

@@ -47,7 +47,8 @@ import { clearStoredAuthSession, type StoredAuthSession } from "@/store/auth";
 const adminNavItems = [
   { href: "/image", label: "生图", icon: ImageIcon },
   { href: "/accounts", label: "号池管理", icon: Users },
-  { href: "/gpt/register", label: "自动注册", icon: Zap },
+  { href: "/gpt/register", label: "GPT 注册", icon: Zap },
+  { href: "/minimax/register", label: "MiniMax 注册", icon: Zap },
   { href: "/image-manager", label: "图片管理", icon: Images },
   { href: "/logs", label: "日志管理", icon: ScrollText },
   { href: "/monitor", label: "监控", icon: Activity },

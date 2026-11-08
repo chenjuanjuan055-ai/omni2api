@@ -491,6 +491,13 @@ def run_registration(
         else:
             # 兼容服务端只返回 continue_url=/about-you 但 page.type 为空/变化的情况。
             if page_type and page_type not in ("about_you", "about-you"):
+                if page_type == "mfa_challenge":
+                    # 该邮箱在 OpenAI 侧已绑定 TOTP 二次验证：邮箱码已验过（email_verified=True），
+                    # 但服务端要求再交一次 TOTP。没有 totp_secret 就只能放弃这个邮箱。
+                    raise RuntimeError(
+                        f"该邮箱在 OpenAI 侧已绑定 TOTP 二次验证（mfa_challenge），"
+                        f"没有 totp_secret 无法继续，请换一个未绑定 MFA 的邮箱。"
+                    )
                 if otp_continue_url and "about-you" not in str(otp_continue_url):
                     raise RuntimeError(
                         f"OTP 后续页面类型未知，不应盲目 create_account: "

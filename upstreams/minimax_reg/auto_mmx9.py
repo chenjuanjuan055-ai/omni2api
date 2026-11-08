@@ -800,7 +800,7 @@ async def main():
     # ★ 失败不消耗账号名额：换出口重试同一个账号（最多 MAX_TRIES 次）。
     #   出口会被 MiniMax 按 IP 限流（同一出口注册几次后 oauth2/login 就 403），
     #   换个出口往往就能成。
-    MAX_TRIES = 3
+    MAX_TRIES = 8
     i = 0
     tries = 0
     while i < total:
@@ -862,6 +862,10 @@ async def main():
 
                 # ★ 调试：把 MiniMax 的接口请求/失败打出来
                 #   （表单点了没反应时，靠这个区分"没发请求"和"服务端拒绝"）
+                # ★ oauth2/login 返回 403 = 这个出口被目标站按 IP 限流了，
+                #   别在同一 IP 上死磕，立刻换出口重试。
+                _blocked = {"hit": False}
+
                 def _on_resp(r):
                     try:
                         rt = r.request.resource_type
@@ -869,6 +873,8 @@ async def main():
                         rt = ""
                     if rt in ("xhr", "fetch"):
                         log("  [api] %s %s" % (r.status, r.url[:78]))
+                        if r.status == 403 and "/oauth2/login" in r.url:
+                            _blocked["hit"] = True
                 page.on("response", _on_resp)
 
                 def _on_fail(r):
@@ -1172,6 +1178,18 @@ async def main():
                             log("%s ⑦ Continue (dom click, 第 %d 次, 同容器=%s, 共%d个)" % (
                                 tag, _try + 1, _ck.get("hit"), _ck.get("n")))
                         await page.wait_for_timeout(7000)
+                        if _blocked["hit"]:
+                            # ★ 这个出口被限流了 → 跳出，换个出口重试
+                            log("%s ⑦ 出口被限流(403)，换出口重试" % tag)
+                            _bl = px.get("node") or px.get("ip")
+                            try:
+                                st2 = json.load(open(PX_STATE, encoding="utf-8"))
+                                st2.setdefault(str(_bl), {})["bad"] = 1
+                                st2[str(_bl)]["ts"] = time.time()
+                                json.dump(st2, open(PX_STATE, "w", encoding="utf-8"), indent=1)
+                            except Exception:
+                                pass
+                            break
                         _st = await page_form(page)
                         if _st.get("pwd") or _st.get("code"):
                             break

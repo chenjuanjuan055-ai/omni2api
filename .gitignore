@@ -38,3 +38,13 @@ totp_results.txt
 _tmp/
 utils/output/
 config.json
+
+# GPT 注册机（turb-gpt-free-register）的运行时产物
+upstreams/gpt-register/turb.sqlite3
+upstreams/gpt-register/*.lock
+upstreams/gpt-register/注册日志/
+upstreams/gpt-register/config/
+upstreams/gpt-register/.env
+upstreams/gpt-register/Default-all-domains-*.json
+upstreams/gpt-register/are-capture-*.jsonl
+upstreams/gpt-register/accounts/

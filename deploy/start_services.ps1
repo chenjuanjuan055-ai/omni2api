@@ -36,6 +36,9 @@ $services = @(
     @{ Name = 'grok2api';        Exe = "$Repo\upstreams\grok2api\backend\bin\grok2api.exe"
        Args = @('--config', 'config.yaml'); WorkDir = "$Repo\upstreams\grok2api"
        Log = "$Repo\upstreams\grok2api\run"; Port = 8002 }
+    @{ Name = 'gpt-register';     Exe = "$Repo\upstreams\gpt-register\.venv\Scripts\python.exe"
+       Args = @('web.py', '--port', '5000'); WorkDir = "$Repo\upstreams\gpt-register"
+       Log = "$Repo\upstreams\gpt-register\webui"; Port = 5000 }
     @{ Name = 'grok-register';    Exe = "$Repo\upstreams\grok-register\.venv\Scripts\python.exe"
        Args = @('-m', 'web.server'); WorkDir = "$Repo\upstreams\grok-register"
        Log = "$Repo\upstreams\grok-register\webui"; Port = 8092 }
@@ -49,6 +52,11 @@ function Get-Listener([int]$Port) {
     if ($c) { return $c.OwningProcess }
     return $null
 }
+
+# turb-gpt-free-register generates a random WebUI auth code on every start unless
+# one is provided. Fix it here so the console can talk to it without scraping
+# the startup log each time.
+$env:WEBUI_AUTH_CODE = 'omni2api-local'
 
 foreach ($s in $services) {
     $pidNow = Get-Listener $s.Port

@@ -166,6 +166,53 @@ PROXY_POOL_UPSTREAM_PROXY=        # 必须清空，否则会串上游
 实测：`LutkinsSmolnicky1962@outlook.com` 走 `passwordless_signup` → `about_you`
 → 建号成功（plan=free，带 access_token + refresh_token），导入主号池后真实对话验证通过。
 
+## 四点五、IMAP 邮箱池可行，但**域名决定成败**
+
+msa-mail-tool 里除 Outlook 外的 20914 张卡都是 **IMAP 类型**（自建域名 / 政府 / 教育 /
+一次性邮箱），turb 原生支持（`EMAIL_SOURCE="imap"` + `core/imap_mail_client.py`）。
+抽样 40 张有 22 个能登录收信（55%）。
+
+真正跑一次注册的对照结果：
+
+| 邮箱 | 域名 | OpenAI 发码 | 结果 |
+|---|---|---|---|
+| `a.bintan.s930@mail.go.id` | 印尼 mail.go.id | ✅ 收到 385796 | **注册成功**（`passwordless_signup` → `about_you`） |
+| `1032079542@aliyun.com` | 中国 aliyun | ❌ 27 轮 × 20 封全是旧信 | 等码超时 |
+
+⇒ **aliyun.com 这类中国邮箱域名 OpenAI 不发验证码**；政府 / 教育 / 印尼等自建域名可以。
+挑卡时按域名筛，别全池盲试。
+
+## 四点六、⚠ turb 导出的 `refresh_token` 不是 OpenAI 的
+
+turb 保存的 `refresh_token` 字段里装的是**邮箱的 MSA token**（`M.C5xx_BAY...`，
+只有 Outlook 来源才有），**不是** OpenAI 的 refresh_token（`rt.1....`）。
+直接填进主号池 ⇒ 刷新失败 ⇒ 又因为 `auto_remove_invalid_accounts=true`，**账号会被自动删掉**
+（实测 LutkinsSmolnicky 那个号就是这么没的）。
+
+补 rt 的正规路径就在 omni2api 自己的 OAuth 流程里：
+
+```
+POST /api/accounts/oauth/start   -> session_id + authorize_url（omni2api 自己的 PKCE）
+   ↓ 用 turb 的 BrowserSession + 邮箱码走完 auth.openai.com
+POST /api/accounts/oauth/finish   -> 换 token 三件套（含 rt.1. 格式）
+```
+
+一键脚本：
+
+```bash
+python scripts/gpt_register_grant_rt.py <email> [http://127.0.0.1:8215]
+```
+
+要点：
+* omni2api 的 authorize 端点是 **`/api/accounts/authorize`**（不是 `/oauth/authorize`），
+  `redirect_uri` 是 `https://platform.openai.com/auth/callback`，
+  所以走完流程 `continue_url` 直接就是 platform 的 callback，可原样喂回 `oauth/finish`。
+* sentinel flow 用 **`authorize_continue`**（需要 turnstile + so + pow 三件）。
+* 落点不是 `/email-verification` 的（= 该邮箱已有带密码账号）要另走密码登录分支。
+
+实测：`a.bintan.s930@mail.go.id` 补完拿到 `rt.1.AADsSv3_QxbvLNIlLRvrRGp5y...`，
+进主号池后真实对话通过（quota=25）。
+
 ## 五、入口
 
 控制台：`http://127.0.0.1:8000/gpt/register` → 「自动注册」

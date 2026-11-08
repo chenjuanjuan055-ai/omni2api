@@ -531,12 +531,14 @@ class MinimaxRegConsole:
         """
         import re
         cands = [n for n in names if n and n != V2RAY_PROXY_NAME]
-        us = [n for n in cands if re.search(r"美国|US|家宽|States|高速", n)]
-        rest = [n for n in cands if n not in us]
-        pick = us + rest
-        if len(pick) > limit:
-            stride = max(1, len(pick) // limit)
-            pick = pick[::stride][:limit]
+        # ★ "高速"节点优先：它们来自不同的中转商，IP 段分散。
+        #   目标站常常是整段封（实测同一批节点被限流时全挂），
+        #   所以探活要尽量覆盖不同来源，而不是在一批里均匀抽样。
+        hi = [n for n in cands if "高速" in n]
+        us = [n for n in cands if n not in hi
+              and re.search(r"美国|US|家宽|States", n)]
+        rest = [n for n in cands if n not in hi and n not in us]
+        pick = (hi + us + rest)[:limit]
         if not pick:
             return False
         self._log("探活出口 %d 个节点…" % len(pick))

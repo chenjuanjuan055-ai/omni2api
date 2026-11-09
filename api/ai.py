@@ -9,6 +9,7 @@ from api.image_inputs import parse_image_edit_request, read_image_sources
 from api.support import require_identity, resolve_image_base_url
 from services.content_filter import check_request, request_shape, request_text
 from services.editable_file_task_service import editable_file_task_service
+from services import upstream_router
 from services.log_service import LoggedCall
 from services.protocol import (
     anthropic_v1_messages,
@@ -87,9 +88,23 @@ def create_router() -> APIRouter:
     async def list_models(authorization: str | None = Header(default=None)):
         require_identity(authorization)
         try:
-            return await run_in_threadpool(openai_v1_models.list_models)
+            result = await run_in_threadpool(openai_v1_models.list_models)
         except Exception as exc:
             raise HTTPException(status_code=502, detail={"error": str(exc)}) from exc
+        # ★ 把上游 provider（Grok2API / MiniMax2API 等）的模型也列进来，
+        #   这样一个 /v1/models 就能看到全部可用模型。
+        try:
+            extra = upstream_router.provider_models()
+        except Exception:
+            extra = []
+        if extra:
+            data = result.get("data") if isinstance(result, dict) else None
+            if isinstance(data, list):
+                seen = {str(x.get("id") or "") for x in data if isinstance(x, dict)}
+                for item in extra:
+                    if item["id"] not in seen:
+                        data.append(item)
+        return result
 
     @router.post("/v1/images/generations")
     async def generate_images(
@@ -136,6 +151,11 @@ def create_router() -> APIRouter:
             request_shape=request_shape(payload.get("messages")),
         )
         await filter_or_log(call, request_preview)
+        # ★ 模型命中上游 provider（Grok2API / MiniMax2API…）时转发过去，
+        #   而不是去 ChatGPT 本地账号池里找 —— 那些账号不支持这些模型。
+        provider = upstream_router.find_provider(model)
+        if provider is not None:
+            return await call.run(upstream_router.chat_completion, provider, payload)
         return await call.run(openai_v1_chat_complete.handle, payload)
 
     @router.post("/v1/responses")
@@ -153,6 +173,9 @@ def create_router() -> APIRouter:
             request_shape=request_shape(payload.get("input")),
         )
         await filter_or_log(call, request_preview)
+        provider = upstream_router.find_provider(model)
+        if provider is not None:
+            return await call.run(upstream_router.responses, provider, payload)
         return await call.run(openai_v1_response.handle, payload)
 
     @router.post("/v1/messages")
@@ -168,6 +191,9 @@ def create_router() -> APIRouter:
         request_preview = request_text(payload.get("system"), payload.get("messages"), payload.get("tools"))
         call = LoggedCall(identity, "/v1/messages", model, "Messages", request_text=request_preview)
         await filter_or_log(call, request_preview)
+        provider = upstream_router.find_provider(model)
+        if provider is not None:
+            return await call.run(upstream_router.messages, provider, payload, sse="anthropic")
         return await call.run(anthropic_v1_messages.handle, payload, sse="anthropic")
 
     @router.post("/v1/search")

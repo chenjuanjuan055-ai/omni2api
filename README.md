@@ -24,6 +24,29 @@
 每个上游的账号池、审计与签到仍由各自维护，控制台只做统一视图与操作代理。
 后续会持续接入更多上游。
 
+**统一网关怎么把请求路由到对应上游**：靠 `config.json` 的 `upstream_providers` 段 ——
+模型名命中某个 provider 的 `models` 列表时，请求原样转发到它的 `base_url`
+（并换成它自己的 `api_key`），否则才走 ChatGPT 本地账号池。
+
+```json
+{
+  "upstream_providers": [
+    {
+      "name": "Grok2API",
+      "type": "openai",
+      "base_url": "http://127.0.0.1:8002",
+      "api_key": "g2a_xxx",
+      "models": ["grok-4.7", "grok-chat-fast"],
+      "enabled": true
+    }
+  ]
+}
+```
+
+支持转发 `/v1/chat/completions`（含 SSE 流式）与 Anthropic 协议的 `/v1/messages`；
+`/v1/models` 会把各上游的模型一并列出，一个端点即可看到全部可用模型。
+`models` 里写 `"*"` 表示该 provider 接管全部模型。
+
 **基座能力（来自上游）**
 
 - OpenAI 兼容接口：`/v1/chat/completions`、`/v1/responses`、`/v1/messages`、`/v1/images/generations|edits`

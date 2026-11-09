@@ -177,14 +177,31 @@ class MinimaxConsole:
         settings = self._load()
         return int(settings.get("ssh_local_port") or DEFAULT_LOCAL_PORT)
 
+    def _base_reachable(self, base: str) -> bool:
+        """base_url 本身能不能连上（本机直跑的部署方式）。"""
+        import urllib.parse as _up
+        try:
+            parsed = _up.urlparse(base)
+            port = parsed.port or (443 if parsed.scheme == "https" else 80)
+            host = parsed.hostname or "127.0.0.1"
+            with socket.create_connection((host, port), timeout=2):
+                return True
+        except Exception:
+            return False
+
     def _ensure_ready(self) -> str:
         base = self._base()
+        # ★ 先看 base_url 本身通不通：minimax2api 现在是本机直跑（8096），
+        #   不该再被"SSH 隧道端口(8080)没开"判成不可达。
+        if self._base_reachable(base):
+            return base
         if self._port_open(self._local_port()):
             return base
         settings = self._load()
         if settings.get("auto_tunnel", True):
             self.start_tunnel()
-            return base
+            if self._base_reachable(base) or self._port_open(self._local_port()):
+                return base
         raise MinimaxConsoleError(f"minimax2api 不可达（{base}），请检查隧道或服务状态")
 
     def _login(self) -> str:
